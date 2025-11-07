@@ -2,44 +2,131 @@
  * 测试Word导出功能
  */
 
-const { generateSupervisionLogWord } = require('../utils/wordGenerator')
+require('dotenv').config()
+const mysql = require('mysql2/promise')
 const fs = require('fs')
 const path = require('path')
 
-// 测试数据
-const testData = {
-  work_name: '示例工程项目',
-  work_code: 'GC-2024-001',
-  log_date: new Date('2024-11-07'),
-  weather: '晴，气温15-25℃，东南风3级',
-  project_dynamics: '今日进行主体结构施工，完成三层楼板浇筑，共计浇筑混凝土150立方米。施工人员50人，机械设备运行正常。进度符合计划要求。',
-  supervision_work: '1. 检查钢筋绑扎质量，符合设计要求和规范要求。\n2. 旁站监理混凝土浇筑过程，振捣密实，养护措施到位。\n3. 审查施工方案，提出优化建议3条。\n4. 组织召开监理例会，协调解决施工中的问题。',
-  safety_work: '1. 检查施工现场安全防护措施，临边防护符合要求。\n2. 检查特种作业人员持证上岗情况，均持有有效证件。\n3. 检查施工用电安全，配电箱防护良好。\n4. 发现安全隐患2处，已要求施工单位立即整改。',
-  recorder_name: '张三',
-  reviewer_name: '李四'
+const dbConfig = {
+  host: process.env.DB_HOST_EXTERNAL,
+  port: process.env.DB_PORT_EXTERNAL,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME
 }
 
 async function testWordExport() {
+  let connection
+  
   try {
-    console.log('开始生成Word文档...')
+    connection = await mysql.createConnection(dbConfig)
+    console.log('✅ 数据库连接成功\n')
     
-    const buffer = await generateSupervisionLogWord(testData)
+    const logId = 1 // 测试日志ID
     
-    console.log('Word文档生成成功！')
-    console.log('文档大小:', (buffer.length / 1024).toFixed(2), 'KB')
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    console.log(`🧪 测试导出日志 ID: ${logId}`)
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
     
-    // 保存到文件
-    const outputPath = path.join(__dirname, '..', 'test-监理日志.docx')
-    fs.writeFileSync(outputPath, buffer)
+    // 执行与后端完全相同的查询
+    console.log('1. 查询日志数据...')
+    const [logs] = await connection.query(`
+      SELECT 
+        sl.*,
+        p.project_name,
+        p.project_code,
+        w.work_name,
+        w.work_code,
+        u.nickname as user_name
+      FROM supervision_logs sl
+      LEFT JOIN projects p ON sl.project_id = p.id
+      LEFT JOIN works w ON sl.work_id = w.id
+      LEFT JOIN users u ON sl.user_id = u.id
+      WHERE sl.id = ?
+    `, [logId])
     
-    console.log('文档已保存到:', outputPath)
-    console.log('✓ 测试通过！')
+    if (logs.length === 0) {
+      console.log('❌ 日志不存在')
+      return
+    }
+    
+    console.log('✅ 日志查询成功\n')
+    
+    const logData = logs[0]
+    
+    console.log('日志数据：')
+    console.log(`  ID: ${logData.id}`)
+    console.log(`  标题: ${logData.title}`)
+    console.log(`  日期: ${logData.log_date}`)
+    console.log(`  天气: ${logData.weather}`)
+    console.log(`  温度: ${logData.temperature || '未填写'}`)
+    console.log(`  项目: ${logData.project_name}`)
+    console.log(`  工程: ${logData.work_name}`)
+    console.log(`  用户: ${logData.user_name}`)
+    console.log('')
+    
+    // 查询附件
+    console.log('2. 查询附件...')
+    const [attachments] = await connection.query(`
+      SELECT 
+        file_name,
+        file_type,
+        file_size
+      FROM attachments
+      WHERE related_type = 'log' AND related_id = ?
+      ORDER BY created_at ASC
+    `, [logId])
+    
+    console.log(`✅ 找到 ${attachments.length} 个附件\n`)
+    
+    logData.attachments = attachments
+    
+    // 尝试生成Word
+    console.log('3. 测试Word生成...')
+    console.log('   使用 docx 库直接生成（无需模板）\n')
+    
+    try {
+      const { generateSupervisionLogWord } = require('../utils/wordGenerator')
+      
+      const wordBuffer = await generateSupervisionLogWord(logData)
+      
+      // 保存到临时文件
+      const outputPath = path.join(__dirname, '测试导出.docx')
+      fs.writeFileSync(outputPath, wordBuffer)
+      
+      console.log('✅ Word生成成功！')
+      console.log(`📁 文件已保存到: ${outputPath}`)
+      console.log(`📊 文件大小: ${(wordBuffer.length / 1024).toFixed(2)} KB\n`)
+      
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+      console.log('🎉 测试成功！')
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n')
+      
+      console.log('现在可以：')
+      console.log('  1. 在小程序中使用日志ID: 1 进行测试')
+      console.log('  2. 确保登录用户ID是: 1')
+      console.log('  3. 测试导出功能\n')
+      
+    } catch (error) {
+      console.log('❌ Word生成失败:', error.message)
+      console.log('\n详细错误:')
+      console.error(error)
+      
+      console.log('\n💡 可能的原因：')
+      console.log('   1. Word模板格式错误')
+      console.log('   2. docxtemplater 配置问题')
+      console.log('   3. 数据格式不匹配\n')
+    }
     
   } catch (error) {
-    console.error('✗ 测试失败:', error)
-    process.exit(1)
+    console.error('❌ 测试失败:', error.message)
+    console.error('\n详细错误:', error)
+  } finally {
+    if (connection) {
+      await connection.end()
+      console.log('🔌 数据库连接已关闭')
+    }
   }
 }
 
 testWordExport()
-
