@@ -104,7 +104,7 @@ async function generateSupervisionLogWord(logData) {
                   new TableCell({
                     width: { size: 25, type: WidthType.PERCENTAGE },
                     verticalAlign: VerticalAlign.CENTER,
-                    children: [createCenteredParagraph(logData.unitWork || logData.unit_work || '')]
+                    children: [createCenteredParagraph(logData.workName || logData.work_name || '')]
                   }),
                   new TableCell({
                     width: { size: 25, type: WidthType.PERCENTAGE },
@@ -131,7 +131,7 @@ async function generateSupervisionLogWord(logData) {
                   new TableCell({
                     width: { size: 25, type: WidthType.PERCENTAGE },
                     verticalAlign: VerticalAlign.CENTER,
-                    children: [createCenteredParagraph(logData.workName || logData.work_name || '')]
+                    children: [createCenteredParagraph(logData.unitWork || logData.unit_work || '')]
                   }),
                   new TableCell({
                     width: { size: 25, type: WidthType.PERCENTAGE },
@@ -260,7 +260,7 @@ async function generateSupervisionLogWord(logData) {
                     width: { size: 75, type: WidthType.PERCENTAGE },
                     verticalAlign: VerticalAlign.CENTER,
                     columnSpan: 3,
-                    children: [createCenteredParagraph(formatDateRange(logData.startDate || logData.start_date, logData.endDate || logData.end_date))]
+                    children: [createCenteredParagraph(formatDateRange(logData.startDate || logData.projectStartDate || logData.project_start_date, logData.endDate || logData.projectEndDate || logData.project_end_date))]
                   })
                 ]
               })

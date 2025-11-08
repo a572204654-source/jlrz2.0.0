@@ -485,10 +485,14 @@ router.get('/:id/export', authenticate, async (req, res) => {
         sl.*,
         p.project_name,
         p.project_code,
+        p.organization,
+        p.chief_engineer,
+        p.start_date as project_start_date,
+        p.end_date as project_end_date,
         w.work_name,
         w.work_code,
-        u.nickname as user_name,
-        u.organization
+        w.unit_work,
+        u.nickname as user_name
        FROM supervision_logs sl
        LEFT JOIN projects p ON sl.project_id = p.id
        LEFT JOIN works w ON sl.work_id = w.id
