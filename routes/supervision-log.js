@@ -158,9 +158,14 @@ router.get('/:id', authenticate, async (req, res) => {
         sl.project_id,
         p.project_name,
         p.project_code,
+        p.organization,
+        p.chief_engineer,
         sl.work_id,
         w.work_name,
         w.work_code,
+        w.unit_work,
+        w.start_date,
+        w.end_date,
         sl.user_id,
         u.nickname as user_name,
         sl.log_date,
@@ -210,9 +215,14 @@ router.get('/:id', authenticate, async (req, res) => {
       projectId: log.project_id,
       projectName: log.project_name,
       projectCode: log.project_code,
+      organization: log.organization,
+      chiefEngineer: log.chief_engineer,
       workId: log.work_id,
       workName: log.work_name,
       workCode: log.work_code,
+      unitWork: log.unit_work,
+      startDate: log.start_date,
+      endDate: log.end_date,
       userId: log.user_id,
       userName: log.user_name,
       logDate: log.log_date,
@@ -477,7 +487,8 @@ router.get('/:id/export', authenticate, async (req, res) => {
         p.project_code,
         w.work_name,
         w.work_code,
-        u.nickname as user_name
+        u.nickname as user_name,
+        u.organization
        FROM supervision_logs sl
        LEFT JOIN projects p ON sl.project_id = p.id
        LEFT JOIN works w ON sl.work_id = w.id
