@@ -101,28 +101,41 @@ app.get('/health', (req, res) => {
   });
 });
 
-// WebSocket 测试接口
-app.ws('/test-ws', (ws, req) => {
-  console.log('✅ WebSocket 测试连接成功');
-  ws.send(JSON.stringify({ 
-    type: 'connected', 
-    message: 'WebSocket 工作正常',
-    timestamp: Date.now()
-  }));
-  
-  ws.on('message', (msg) => {
-    console.log('收到测试消息:', msg.toString());
+// WebSocket 测试接口延迟注册函数
+// 必须在 express-ws 初始化之后调用
+app.initWebSocketTest = function() {
+  // 检查 app.ws 是否存在
+  if (typeof app.ws !== 'function') {
+    console.error('❌ app.ws 不可用，express-ws 可能未正确初始化');
+    return false;
+  }
+
+  // WebSocket 测试接口
+  app.ws('/test-ws', (ws, req) => {
+    console.log('✅ WebSocket 测试连接成功');
     ws.send(JSON.stringify({ 
-      type: 'echo', 
-      data: msg.toString(),
+      type: 'connected', 
+      message: 'WebSocket 工作正常',
       timestamp: Date.now()
     }));
+    
+    ws.on('message', (msg) => {
+      console.log('收到测试消息:', msg.toString());
+      ws.send(JSON.stringify({ 
+        type: 'echo', 
+        data: msg.toString(),
+        timestamp: Date.now()
+      }));
+    });
+    
+    ws.on('close', () => {
+      console.log('WebSocket 测试连接已关闭');
+    });
   });
-  
-  ws.on('close', () => {
-    console.log('WebSocket 测试连接已关闭');
-  });
-});
+
+  console.log('✓ WebSocket 测试接口已注册');
+  return true;
+};
 
 // 环境变量诊断接口（用于排查配置问题）
 app.get('/diagnose', (req, res) => {

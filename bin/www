@@ -49,6 +49,14 @@ try {
   expressWs(app, server);
   console.log('✓ express-ws WebSocket 服务器已初始化');
   
+  // 初始化 WebSocket 测试接口（必须在 express-ws 初始化之后）
+  if (app.initWebSocketTest) {
+    const success = app.initWebSocketTest();
+    if (!success) {
+      console.warn('⚠️  WebSocket 测试接口注册失败');
+    }
+  }
+  
   // 初始化 WebSocket 路由（必须在 express-ws 初始化之后）
   const realtimeVoiceRouter = require('../routes/realtime-voice');
   if (realtimeVoiceRouter.initWebSocketRoutes) {
