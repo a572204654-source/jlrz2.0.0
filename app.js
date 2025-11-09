@@ -1,6 +1,5 @@
 var createError = require('http-errors');
 var express = require('express');
-var expressWs = require('express-ws');
 var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
@@ -11,8 +10,8 @@ require('dotenv').config();
 
 var app = express();
 
-// 启用WebSocket支持（必须在路由加载之前）
-expressWs(app);
+// 注意：express-ws 将在 bin/www 中初始化，在HTTP服务器创建之后
+// 这里不初始化，避免服务器实例未创建的问题
 
 // 路由模块
 var indexRouter = require('./routes/index');

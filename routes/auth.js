@@ -19,10 +19,25 @@ async function handleWechatLogin(req, res) {
 
     let openid, sessionKey, unionid
 
-    // 🧪 开发环境：支持测试code
-    if (process.env.NODE_ENV === 'development' && code.startsWith('test_wechat_code_')) {
+    // 🧪 测试模式：支持测试code（开发环境或明确启用测试模式）
+    const enableTestMode = process.env.NODE_ENV === 'development' || process.env.ENABLE_TEST_LOGIN === 'true'
+    if (enableTestMode && code.startsWith('test_wechat_code_')) {
       console.log('🧪 [测试模式] 使用测试登录code:', code)
-      openid = 'test_openid_888888'
+      // 从code中提取openid（如果包含），否则使用默认测试openid
+      // 支持格式: test_wechat_code_openid=xxx_xxx 或 test_wechat_code_realtime_voice_xxx
+      let testOpenid = 'test_openid_888888'
+      const openidMatch = code.match(/openid=([^_]+)/)
+      if (openidMatch) {
+        // 如果code中包含openid=xxx，使用 test_openid_realtime_voice_xxx
+        testOpenid = `test_openid_realtime_voice_${openidMatch[1]}`
+      } else if (code.includes('realtime_voice_')) {
+        // 如果code中包含realtime_voice_，提取完整openid
+        const realtimeMatch = code.match(/realtime_voice_(\d+)/)
+        if (realtimeMatch) {
+          testOpenid = `test_openid_realtime_voice_${realtimeMatch[1]}`
+        }
+      }
+      openid = testOpenid
       sessionKey = 'test_session_key'
       unionid = ''
     } else {

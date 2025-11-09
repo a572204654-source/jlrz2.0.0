@@ -42,6 +42,19 @@ console.log('==================================');
 var server = http.createServer(app);
 
 /**
+ * 初始化 express-ws（必须在服务器创建之后）
+ */
+try {
+  const expressWs = require('express-ws');
+  expressWs(app, server);
+  console.log('✓ express-ws WebSocket 服务器已初始化');
+} catch (error) {
+  console.error('✗ express-ws 初始化失败:', error.message);
+  console.error('错误堆栈:', error.stack);
+  console.warn('⚠️  WebSocket 功能将不可用');
+}
+
+/**
  * 初始化 Socket.IO
  */
 try {
@@ -140,6 +153,8 @@ function onListening() {
   console.log('✓ 服务器启动成功');
   console.log(`✓ 监听地址: ${bind}`);
   console.log(`✓ 健康检查: http://localhost:${port}/health`);
+  console.log(`✓ WebSocket测试: ws://localhost:${port}/api/realtime-voice/test`);
+  console.log(`✓ WebSocket识别: ws://localhost:${port}/api/realtime-voice/stream`);
   console.log('==================================');
   debug('Listening on ' + bind);
 }

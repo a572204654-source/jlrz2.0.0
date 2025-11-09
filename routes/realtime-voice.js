@@ -6,7 +6,7 @@ const { query } = require('../config/database')
 const { authenticate } = require('../middleware/auth')
 const { getVoiceRecognitionService } = require('../utils/voiceRecognition')
 
-// 注意：WebSocket 支持已在 app.js 中通过 expressWs(app) 启用
+// 注意：WebSocket 支持已在 bin/www 中通过 expressWs(app, server) 启用
 // 所有通过 app.use() 挂载的 router 都会自动获得 .ws() 方法
 
 // 配置文件上传（使用内存存储）
@@ -91,6 +91,53 @@ router.post('/recognize', authenticate, upload.single('audio'), async (req, res)
 })
 
 /**
+ * WebSocket测试接口
+ * WS /api/realtime-voice/test
+ * 
+ * 用于测试WebSocket连接是否正常
+ */
+router.ws('/test', (ws, req) => {
+  console.log('WebSocket测试客户端已连接')
+  
+  // 立即发送欢迎消息
+  ws.send(JSON.stringify({
+    type: 'welcome',
+    message: 'WebSocket连接成功！',
+    timestamp: Date.now()
+  }))
+  
+  // 监听消息
+  ws.on('message', (msg) => {
+    try {
+      const message = JSON.parse(msg.toString())
+      console.log('收到测试消息:', message)
+      
+      // 回显消息
+      ws.send(JSON.stringify({
+        type: 'echo',
+        original: message,
+        timestamp: Date.now()
+      }))
+    } catch (error) {
+      ws.send(JSON.stringify({
+        type: 'error',
+        message: '消息格式错误'
+      }))
+    }
+  })
+  
+  // 连接关闭
+  ws.on('close', () => {
+    console.log('WebSocket测试客户端已断开')
+  })
+  
+  // 连接错误
+  ws.on('error', (error) => {
+    console.error('WebSocket测试错误:', error)
+  })
+})
+
+/**
  * 实时语音识别（WebSocket流式）
  * WS /api/realtime-voice/stream
  * 
@@ -98,7 +145,7 @@ router.post('/recognize', authenticate, upload.single('audio'), async (req, res)
  * 客户端需要持续发送音频数据帧
  */
 router.ws('/stream', (ws, req) => {
-  console.log('WebSocket客户端已连接')
+  console.log('WebSocket客户端已连接:', req.url)
 
   let recognition = null
   let userId = null
