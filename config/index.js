@@ -70,6 +70,23 @@ module.exports = {
     apiHost: process.env.QWEATHER_API_HOST || 'https://ma4bjadbw4.re.qweatherapi.com',
     timeout: 8000,
     cacheTime: 300 // 缓存5分钟
+  },
+
+  // 腾讯云语音识别配置
+  tencentAsr: {
+    // 腾讯云 API 密钥（优先使用标准环境变量名）
+    secretId: process.env.TENCENTCLOUD_SECRET_ID || process.env.TENCENT_SECRET_ID || '',
+    secretKey: process.env.TENCENTCLOUD_SECRET_KEY || process.env.TENCENT_SECRET_KEY || '',
+    // 地域（默认广州）
+    region: process.env.TENCENT_REGION || 'ap-guangzhou',
+    // 项目ID（可选）
+    projectId: process.env.TENCENT_PROJECT_ID || 0,
+    // 默认引擎类型
+    defaultEngineType: process.env.ASR_ENGINE_TYPE || '16k_zh',
+    // 默认音频格式（1=PCM, 4=WAV, 8=MP3）
+    defaultVoiceFormat: parseInt(process.env.ASR_VOICE_FORMAT || '1'),
+    // 请求超时时间（毫秒）
+    timeout: parseInt(process.env.ASR_TIMEOUT || '10000')
   }
 };
 

@@ -25,14 +25,16 @@ var weatherRouter = require('./routes/weather');
 var weatherSimpleRouter = require('./routes/weather-simple');
 var weatherV1Router = require('./routes/v1/weather');
 
-// 语音识别路由（旧版本，保留兼容）
+// 语音识别路由（使用腾讯云API）
 var voiceRecognitionRouter = require('./routes/voice-recognition');
 
 // 实时语音识别路由（新版本，WebSocket流式）
-var realtimeVoiceRouter = require('./routes/realtime-voice');
+// 注意：以下路由文件不存在，已注释
+// var realtimeVoiceRouter = require('./routes/realtime-voice');
 
 // 实时语音识别路由（Socket.IO版本，用于微信云托管）
-const { router: realtimeVoiceSocketIORouter, initSocketIO } = require('./routes/realtime-voice-socketio');
+// 注意：以下路由文件不存在，已注释
+// const { router: realtimeVoiceSocketIORouter, initSocketIO } = require('./routes/realtime-voice-socketio');
 
 // 中间件
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
@@ -73,24 +75,26 @@ app.use('/api/weather', weatherRouter);
 app.use('/api/weather', weatherSimpleRouter);
 app.use('/api/v1/weather', weatherV1Router);
 
-// 语音识别API路由（旧版本，保留兼容）
+// 语音识别API路由（使用腾讯云API）
 app.use('/api/voice-recognition', voiceRecognitionRouter);
 
 // 实时语音识别API路由（新版本，WebSocket流式）
-app.use('/api/realtime-voice', realtimeVoiceRouter);
+// 注意：以下路由文件不存在，已注释
+// app.use('/api/realtime-voice', realtimeVoiceRouter);
 
 // 实时语音识别API路由（Socket.IO版本，用于微信云托管）
-app.use('/api/realtime-voice-socketio', realtimeVoiceSocketIORouter);
+// 注意：以下路由文件不存在，已注释
+// app.use('/api/realtime-voice-socketio', realtimeVoiceSocketIORouter);
 
 // 初始化 Socket.IO（从 bin/www 中获取 io 实例）
-// 这个函数会在服务器启动后被调用
-app.initSocketIO = function() {
-  const io = app.get('io');
-  if (io) {
-    initSocketIO(io);
-    console.log('Socket.IO 实时语音识别已初始化');
-  }
-};
+// 注意：以下功能已注释，因为相关路由文件不存在
+// app.initSocketIO = function() {
+//   const io = app.get('io');
+//   if (io) {
+//     initSocketIO(io);
+//     console.log('Socket.IO 实时语音识别已初始化');
+//   }
+// };
 
 // 健康检查接口（用于云托管健康检测）
 app.get('/health', (req, res) => {
