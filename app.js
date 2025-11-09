@@ -25,8 +25,6 @@ var weatherRouter = require('./routes/weather');
 var weatherSimpleRouter = require('./routes/weather-simple');
 var weatherV1Router = require('./routes/v1/weather');
 
-// 语音识别路由（使用腾讯云API）
-var voiceRecognitionRouter = require('./routes/voice-recognition');
 
 // 实时语音识别路由（新版本，WebSocket流式）
 // 注意：以下路由文件不存在，已注释
@@ -58,6 +56,17 @@ app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'hbs');
 
 app.use(logger('dev'));
+// 设置JSON响应字符编码为UTF-8，防止中文乱码
+app.use((req, res, next) => {
+  // 保存原始的json方法
+  const originalJson = res.json;
+  // 重写json方法，确保设置UTF-8编码
+  res.json = function(data) {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    return originalJson.call(this, data);
+  };
+  next();
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
@@ -75,8 +84,6 @@ app.use('/api/weather', weatherRouter);
 app.use('/api/weather', weatherSimpleRouter);
 app.use('/api/v1/weather', weatherV1Router);
 
-// 语音识别API路由（使用腾讯云API）
-app.use('/api/voice-recognition', voiceRecognitionRouter);
 
 // 实时语音识别API路由（新版本，WebSocket流式）
 // 注意：以下路由文件不存在，已注释

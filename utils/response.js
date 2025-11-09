@@ -2,8 +2,14 @@
  * 统一响应格式
  */
 
+// 设置响应字符编码为UTF-8
+function setUTF8Encoding(res) {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+}
+
 // 成功响应
 function success(res, data = null, message = '操作成功') {
+  setUTF8Encoding(res);
   return res.json({
     code: 0,
     message,
@@ -14,6 +20,7 @@ function success(res, data = null, message = '操作成功') {
 
 // 失败响应
 function error(res, message = '操作失败', code = -1, statusCode = 200) {
+  setUTF8Encoding(res);
   return res.status(statusCode).json({
     code,
     message,

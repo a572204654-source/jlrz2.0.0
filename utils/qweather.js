@@ -24,8 +24,12 @@ function createAuthenticatedClient() {
     timeout: 10000,
     headers: {
       'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    }
+      'Content-Type': 'application/json; charset=utf-8',
+      'Accept': 'application/json; charset=utf-8'
+    },
+    // 确保响应数据使用UTF-8编码
+    responseType: 'json',
+    responseEncoding: 'utf8'
   })
 }
 
