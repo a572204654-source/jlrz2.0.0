@@ -65,15 +65,25 @@ router.get('/current', authenticate, async (req, res) => {
     }
 
     // 计算日期差（相对于今天）
+    // 使用本地时区计算，避免时区问题
     const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const target = new Date(targetDate)
-    target.setHours(0, 0, 0, 0)
-    const diffDays = Math.floor((target - today) / (1000 * 60 * 60 * 24))
+    const todayYear = today.getFullYear()
+    const todayMonth = today.getMonth()
+    const todayDay = today.getDate()
+    const todayLocal = new Date(todayYear, todayMonth, todayDay, 0, 0, 0, 0)
+    
+    // 解析目标日期
+    const [year, month, day] = targetDate.split('-').map(Number)
+    const targetLocal = new Date(year, month - 1, day, 0, 0, 0, 0)
+    
+    const diffDays = Math.floor((targetLocal - todayLocal) / (1000 * 60 * 60 * 24))
+
+    const todayStr = `${todayYear}-${String(todayMonth + 1).padStart(2, '0')}-${String(todayDay).padStart(2, '0')}`
+    console.log(`日期计算: 今天=${todayStr}, 目标=${targetDate}, 相差=${diffDays}天`)
 
     // 检查日期范围（前后10天）
     if (diffDays < -10 || diffDays > 10) {
-      return badRequest(res, '日期超出范围，仅支持当前日期前后10天')
+      return badRequest(res, `日期超出范围，仅支持当前日期前后10天（当前日期: ${todayStr}, 目标日期: ${targetDate}, 相差: ${diffDays}天）`)
     }
 
     // 和风天气API需要的location格式：经度,纬度
@@ -150,7 +160,7 @@ router.get('/current', authenticate, async (req, res) => {
 
       } else {
         // 今天，使用实时天气和今日预报
-        console.log('获取今天天气')
+        console.log(`获取今天天气: ${targetDate} (diffDays: ${diffDays})`)
 
         const { getWeatherNow, getWeatherDaily } = require('../../utils/qweather')
         const [nowResult, dailyResult] = await Promise.all([
@@ -159,11 +169,25 @@ router.get('/current', authenticate, async (req, res) => {
         ])
 
         if (!nowResult.success || !dailyResult.success) {
-          return serverError(res, '获取今天天气失败')
+          const errors = []
+          if (!nowResult.success) {
+            errors.push(`实时天气: ${nowResult.error || '未知错误'}`)
+            console.error('获取实时天气失败:', nowResult.error)
+          }
+          if (!dailyResult.success) {
+            errors.push(`每日预报: ${dailyResult.error || '未知错误'}`)
+            console.error('获取每日预报失败:', dailyResult.error)
+          }
+          return serverError(res, `获取今天天气失败: ${errors.join('; ')}`)
         }
 
         const now = nowResult.data
         const today = dailyResult.data[0]
+
+        if (!now || !today) {
+          console.error('天气数据不完整:', { now, today })
+          return serverError(res, '天气数据不完整')
+        }
 
         weatherData = {
           weather: `天气 ${now.text} · 气温: ${today.tempMin}-${today.tempMax} · 风向: ${now.windDir} · 风力: ${now.windScale}`,
