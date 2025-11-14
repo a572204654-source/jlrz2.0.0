@@ -97,9 +97,21 @@ async function getWeatherDaily(location, days = 7) {
     }
   } catch (error) {
     console.error('获取天气预报失败:', error)
+    // 提取更详细的错误信息
+    let errorMessage = error.message
+    if (error.response) {
+      // HTTP 错误响应
+      errorMessage = `HTTP ${error.response.status}: ${error.message}`
+      if (error.response.data && error.response.data.code) {
+        errorMessage += ` (API错误码: ${error.response.data.code})`
+      }
+    } else if (error.request) {
+      // 请求已发送但没有收到响应
+      errorMessage = `请求超时或网络错误: ${error.message}`
+    }
     return {
       success: false,
-      error: error.message
+      error: errorMessage
     }
   }
 }

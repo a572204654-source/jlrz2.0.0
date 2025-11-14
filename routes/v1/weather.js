@@ -163,9 +163,10 @@ router.get('/current', authenticate, async (req, res) => {
         console.log(`获取今天天气: ${targetDate} (diffDays: ${diffDays})`)
 
         const { getWeatherNow, getWeatherDaily } = require('../../utils/qweather')
+        // 和风天气API不支持1天预报，使用3天预报然后取第一项
         const [nowResult, dailyResult] = await Promise.all([
           getWeatherNow(location),
-          getWeatherDaily(location, 1)
+          getWeatherDaily(location, 3)
         ])
 
         if (!nowResult.success || !dailyResult.success) {
