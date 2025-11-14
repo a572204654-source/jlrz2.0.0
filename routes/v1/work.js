@@ -1,7 +1,7 @@
 const express = require('express')
 const router = express.Router()
 const { success, badRequest, serverError, notFound, forbidden } = require('../../utils/response')
-const { query } = require('../../config/database')
+const { query, transaction } = require('../../config/database')
 const { authenticate } = require('../../middleware/auth')
 
 /**
@@ -31,7 +31,7 @@ router.get('/works', authenticate, async (req, res) => {
       params.push(`%${keyword}%`, `%${keyword}%`)
     }
 
-    // 查询工程列表
+    // 查询工程列表，同时统计每个工程的日志数量
     const works = await query(
       `SELECT 
         w.id,
@@ -42,9 +42,12 @@ router.get('/works', authenticate, async (req, res) => {
         w.start_date as startDate,
         w.end_date as endDate,
         w.color,
-        w.created_at as createdAt
+        w.created_at as createdAt,
+        COALESCE(COUNT(sl.id), 0) as logCount
        FROM works w
+       LEFT JOIN supervision_logs sl ON w.id = sl.work_id
        WHERE ${whereClause}
+       GROUP BY w.id
        ORDER BY w.created_at DESC
        LIMIT ? OFFSET ?`,
       [...params, pageSize, offset]
@@ -78,7 +81,7 @@ router.get('/works/:id', authenticate, async (req, res) => {
     const { id } = req.params
     const userId = req.userId
 
-    // 查询工程详情 - 只能查看自己创建的工程
+    // 查询工程详情 - 只能查看自己创建的工程，同时统计日志数量
     const works = await query(
       `SELECT 
         w.id,
@@ -94,10 +97,13 @@ router.get('/works/:id', authenticate, async (req, res) => {
         w.description,
         p.organization,
         p.chief_engineer as chiefEngineer,
-        w.created_at as createdAt
+        w.created_at as createdAt,
+        COALESCE(COUNT(sl.id), 0) as logCount
        FROM works w
        LEFT JOIN projects p ON w.project_id = p.id
-       WHERE w.id = ? AND w.creator_id = ?`,
+       LEFT JOIN supervision_logs sl ON w.id = sl.work_id
+       WHERE w.id = ? AND w.creator_id = ?
+       GROUP BY w.id`,
       [id, userId]
     )
 
@@ -105,7 +111,11 @@ router.get('/works/:id', authenticate, async (req, res) => {
       return notFound(res, '工程不存在或无权访问')
     }
 
-    return success(res, works[0])
+    const work = works[0]
+    // 确保 logCount 是数字类型
+    work.logCount = parseInt(work.logCount) || 0
+
+    return success(res, work)
 
   } catch (error) {
     console.error('获取工程详情错误:', error)
@@ -248,6 +258,9 @@ router.put('/works/:id', authenticate, async (req, res) => {
 /**
  * 删除工程
  * DELETE /api/v1/works/:id
+ * 
+ * 功能变更：移除删除限制，允许删除有日志的工程
+ * 删除时自动级联删除关联的监理日志和附件
  */
 router.delete('/works/:id', authenticate, async (req, res) => {
   try {
@@ -264,20 +277,45 @@ router.delete('/works/:id', authenticate, async (req, res) => {
       return notFound(res, '工程不存在或无权操作')
     }
 
-    // 检查是否有关联的监理日志
-    const logs = await query(
-      'SELECT COUNT(*) as count FROM supervision_logs WHERE work_id = ?',
-      [id]
-    )
+    // 使用事务确保数据一致性
+    await transaction(async (connection) => {
+      // 1. 查询该工程下的所有监理日志ID
+      const [logs] = await connection.execute(
+        'SELECT id FROM supervision_logs WHERE work_id = ?',
+        [id]
+      )
 
-    if (logs[0].count > 0) {
-      return badRequest(res, '该工程下存在监理日志，无法删除')
-    }
+      const logIds = logs.map(log => log.id)
 
-    // 删除工程
-    await query('DELETE FROM works WHERE id = ?', [id])
+      // 2. 删除关联的附件（包括工程附件和日志附件）
+      if (logIds.length > 0) {
+        // 删除日志关联的附件 - 使用占位符构建 IN 查询
+        const placeholders = logIds.map(() => '?').join(',')
+        await connection.execute(
+          `DELETE FROM attachments WHERE related_type = ? AND related_id IN (${placeholders})`,
+          ['log', ...logIds]
+        )
+      }
 
-    return success(res, {}, '删除成功')
+      // 删除工程关联的附件
+      await connection.execute(
+        'DELETE FROM attachments WHERE related_type = ? AND related_id = ?',
+        ['work', id]
+      )
+
+      // 3. 删除关联的监理日志
+      if (logIds.length > 0) {
+        await connection.execute(
+          'DELETE FROM supervision_logs WHERE work_id = ?',
+          [id]
+        )
+      }
+
+      // 4. 删除工程
+      await connection.execute('DELETE FROM works WHERE id = ?', [id])
+    })
+
+    return success(res, null, '删除成功')
 
   } catch (error) {
     console.error('删除工程错误:', error)
