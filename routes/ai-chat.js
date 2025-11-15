@@ -13,12 +13,16 @@ const { chatWithContext } = require('../utils/doubao')
 router.post('/session', authenticate, async (req, res) => {
   try {
     // 生成会话ID
-    const sessionId = 'session_' + Date.now() + '_' + randomString(8)
+    const sessionId = 'sess_' + Date.now() + '_' + randomString(8)
+    const createTime = new Date().toISOString()
 
     // 可以选择性地在数据库中记录会话创建
-    // 目前仅返回会话ID
+    // 目前仅返回会话ID和创建时间
     
-    return success(res, { sessionId })
+    return success(res, { 
+      sessionId,
+      createTime
+    })
 
   } catch (error) {
     console.error('创建会话错误:', error)
@@ -86,9 +90,9 @@ router.post('/send', authenticate, async (req, res) => {
     )
 
     return success(res, {
-      sessionId,
-      messageId: aiMessageResult.insertId,
-      aiReply
+      aiReply,
+      messageId: aiMessageResult.insertId.toString(),
+      timestamp: new Date().toISOString()
     })
 
   } catch (error) {
@@ -133,12 +137,11 @@ router.get('/history', authenticate, async (req, res) => {
       [userId, sessionId]
     )
 
-    // 转换为驼峰命名
-    const list = messages.map(msg => ({
-      id: msg.id,
-      messageType: msg.message_type,
+    // 转换为文档要求的格式
+    const formattedMessages = messages.map(msg => ({
+      type: msg.message_type,
       content: msg.content,
-      createdAt: msg.created_at
+      timestamp: msg.created_at
     }))
 
     // 查询总数
@@ -148,9 +151,10 @@ router.get('/history', authenticate, async (req, res) => {
     )
 
     return success(res, {
-      sessionId,
+      messages: formattedMessages,
       total: countResult.total,
-      list
+      page,
+      pageSize
     })
 
   } catch (error) {
@@ -201,25 +205,29 @@ router.get('/sessions', authenticate, async (req, res) => {
     const sessions = await query(
       `SELECT 
         session_id,
-        COUNT(*) as message_count,
-        MAX(created_at) as last_message_time,
+        MIN(created_at) as create_time,
+        MAX(created_at) as update_time,
+        (SELECT content FROM ai_chat_logs 
+         WHERE user_id = ? AND session_id = acl.session_id
+         ORDER BY created_at DESC LIMIT 1) as last_message,
         (SELECT content FROM ai_chat_logs 
          WHERE user_id = ? AND session_id = acl.session_id AND message_type = 'user'
-         ORDER BY created_at DESC LIMIT 1) as last_user_message
+         ORDER BY created_at ASC LIMIT 1) as first_user_message
        FROM ai_chat_logs acl
        WHERE user_id = ?
        GROUP BY session_id
        ORDER BY MAX(created_at) DESC
        LIMIT ${pageSize} OFFSET ${offset}`,
-      [userId, userId]
+      [userId, userId, userId]
     )
 
-    // 转换为驼峰命名
-    const list = sessions.map(s => ({
+    // 转换为文档要求的格式
+    const formattedSessions = sessions.map(s => ({
       sessionId: s.session_id,
-      messageCount: s.message_count,
-      lastMessageTime: s.last_message_time,
-      lastUserMessage: s.last_user_message
+      title: s.first_user_message ? s.first_user_message.substring(0, 20) + (s.first_user_message.length > 20 ? '...' : '') : '新会话',
+      lastMessage: s.last_message,
+      updateTime: s.update_time,
+      createTime: s.create_time
     }))
 
     // 查询总数
@@ -231,10 +239,10 @@ router.get('/sessions', authenticate, async (req, res) => {
     )
 
     return success(res, {
+      sessions: formattedSessions,
       total: countResult.total,
       page,
-      pageSize,
-      list
+      pageSize
     })
 
   } catch (error) {

@@ -8,6 +8,7 @@ const projectRouter = require('./project')
 const workRouter = require('./work')
 const supervisionLogRouter = require('./supervision-log')
 const aiChatRouter = require('./ai-chat')
+const aiProviderRouter = require('./ai-provider')
 const attachmentRouter = require('./attachment')
 const weatherRouter = require('./weather')
 
@@ -17,7 +18,8 @@ router.use('/user', userRouter)
 router.use('/projects', projectRouter)
 router.use('/works', workRouter)
 router.use('/supervision-logs', supervisionLogRouter)
-router.use('/ai-chat', aiChatRouter)
+router.use('/ai/chat', aiChatRouter)
+router.use('/ai', aiProviderRouter)
 router.use('/attachments', attachmentRouter)
 router.use('/weather', weatherRouter)
 
@@ -34,7 +36,7 @@ router.get('/', (req, res) => {
       work: '工程模块 - 工程CRUD',
       supervisionLog: '监理日志模块 - 日志CRUD、导出',
       aiChat: 'AI助手模块 - 对话管理',
-      attachment: '附件模块 - 文件上传、管理',
+      attachment: '附件模块 - 附件管理',
       weather: '气象模块 - 根据位置获取气象信息'
     },
     endpoints: {
@@ -43,7 +45,8 @@ router.get('/', (req, res) => {
       projects: '/api/projects - 项目相关接口',
       works: '/api/works - 工程相关接口',
       supervisionLogs: '/api/supervision-logs - 监理日志相关接口',
-      aiChat: '/api/ai-chat/* - AI助手相关接口',
+      aiChat: '/api/ai/chat/* - AI助手对话相关接口',
+      aiProvider: '/api/ai/provider-key - AI提供商密钥接口',
       attachments: '/api/attachments - 附件相关接口',
       weather: '/api/weather/current - 气象相关接口'
     }

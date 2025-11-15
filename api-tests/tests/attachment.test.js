@@ -1,7 +1,6 @@
 /**
  * 附件模块测试
  * 测试接口：
- * - POST /api/v1/attachments/upload - 上传附件
  * - GET /api/v1/attachments - 获取附件列表
  * - GET /api/v1/attachments/:id - 获取附件详情
  * - DELETE /api/v1/attachments/:id - 删除附件
@@ -20,56 +19,10 @@ const testData = {
 }
 
 /**
- * 测试1: 上传附件
- */
-async function testUploadAttachment(relatedType = 'log', relatedId = 1) {
-  logger.module('测试1: 上传附件')
-  
-  try {
-    // 模拟附件数据（实际应用中fileUrl应该是真实的云存储URL）
-    const attachmentData = {
-      relatedType: relatedType,
-      relatedId: relatedId,
-      fileName: `测试附件_${Date.now()}.jpg`,
-      fileType: 'image/jpeg',
-      fileUrl: `https://example.com/test_${Date.now()}.jpg`,
-      fileSize: 102400
-    }
-    
-    logger.info('请求参数', attachmentData)
-    
-    const response = await http.post('/api/v1/attachments/upload', attachmentData)
-    
-    logger.info('响应数据', response)
-    
-    // 验证响应
-    assert.assertSuccess(response, '上传附件成功')
-    assert.assertExists(response.data, '返回数据存在')
-    assert.assertHasField(response.data, 'id', '包含附件ID')
-    assert.assertHasField(response.data, 'fileName', '包含文件名')
-    assert.assertHasField(response.data, 'fileUrl', '包含文件URL')
-    
-    // 保存附件ID供后续测试使用
-    if (response.data.id) {
-      testData.attachmentId = response.data.id
-      testData.attachmentIds.push(response.data.id)
-      logger.success(`附件ID: ${testData.attachmentId}`)
-    }
-    
-    logger.divider()
-    return true
-  } catch (error) {
-    logger.error('上传附件测试失败', error)
-    logger.divider()
-    return false
-  }
-}
-
-/**
- * 测试2: 获取附件列表
+ * 测试1: 获取附件列表
  */
 async function testGetAttachments() {
-  logger.module('测试2: 获取附件列表')
+  logger.module('测试1: 获取附件列表')
   
   try {
     const params = {
@@ -104,10 +57,10 @@ async function testGetAttachments() {
 }
 
 /**
- * 测试3: 获取附件详情
+ * 测试2: 获取附件详情
  */
 async function testGetAttachmentDetail() {
-  logger.module('测试3: 获取附件详情')
+  logger.module('测试2: 获取附件详情')
   
   if (!testData.attachmentId) {
     logger.warn('跳过测试: 没有可用的附件ID')
@@ -139,46 +92,10 @@ async function testGetAttachmentDetail() {
 }
 
 /**
- * 测试4: 批量上传附件（为批量删除做准备）
- */
-async function testBatchUploadAttachments() {
-  logger.module('测试4: 批量上传附件（为批量删除做准备）')
-  
-  try {
-    // 上传3个附件
-    for (let i = 0; i < 3; i++) {
-      const attachmentData = {
-        relatedType: 'log',
-        relatedId: 1,
-        fileName: `批量测试附件_${i + 1}_${Date.now()}.jpg`,
-        fileType: 'image/jpeg',
-        fileUrl: `https://example.com/batch_test_${i + 1}_${Date.now()}.jpg`,
-        fileSize: 50000 + i * 1000
-      }
-      
-      const response = await http.post('/api/v1/attachments/upload', attachmentData)
-      
-      if (response.code === 0 && response.data.id) {
-        testData.attachmentIds.push(response.data.id)
-        logger.success(`上传附件 ${i + 1}: ID=${response.data.id}`)
-      }
-    }
-    
-    logger.success(`批量上传完成，共 ${testData.attachmentIds.length} 个附件`)
-    logger.divider()
-    return true
-  } catch (error) {
-    logger.error('批量上传附件测试失败', error)
-    logger.divider()
-    return false
-  }
-}
-
-/**
- * 测试5: 批量删除附件
+ * 测试3: 批量删除附件
  */
 async function testBatchDeleteAttachments() {
-  logger.module('测试5: 批量删除附件')
+  logger.module('测试3: 批量删除附件')
   
   if (testData.attachmentIds.length === 0) {
     logger.warn('跳过测试: 没有可用的附件ID')
@@ -214,15 +131,14 @@ async function testBatchDeleteAttachments() {
 }
 
 /**
- * 测试6: 删除单个附件
+ * 测试4: 删除单个附件
  */
 async function testDeleteAttachment() {
-  logger.module('测试6: 删除单个附件')
+  logger.module('测试4: 删除单个附件')
   
-  // 先上传一个附件用于删除测试
-  const uploadResult = await testUploadAttachment('log', 1)
-  if (!uploadResult || !testData.attachmentId) {
-    logger.warn('跳过测试: 无法创建测试附件')
+  // 注意：此测试需要先手动创建测试附件，或跳过
+  if (!testData.attachmentId) {
+    logger.warn('跳过测试: 没有可用的附件ID')
     logger.divider()
     return true
   }
@@ -255,17 +171,11 @@ async function runAllTests() {
   
   const results = []
   
-  // 上传附件
-  results.push(await testUploadAttachment('log', 1))
-  
   // 获取附件列表
   results.push(await testGetAttachments())
   
   // 获取附件详情
   results.push(await testGetAttachmentDetail())
-  
-  // 批量上传附件
-  results.push(await testBatchUploadAttachments())
   
   // 批量删除附件
   results.push(await testBatchDeleteAttachments())

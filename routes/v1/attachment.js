@@ -5,66 +5,6 @@ const { query } = require('../../config/database')
 const { authenticate } = require('../../middleware/auth')
 
 /**
- * 上传附件
- * POST /api/v1/attachments/upload
- */
-router.post('/attachments/upload', authenticate, async (req, res) => {
-  try {
-    const userId = req.userId
-    const { relatedType, relatedId, fileName, fileType, fileUrl, fileSize } = req.body
-
-    // 参数验证
-    if (!relatedType) {
-      return badRequest(res, '关联类型不能为空')
-    }
-    if (!relatedId) {
-      return badRequest(res, '关联ID不能为空')
-    }
-    if (!fileName) {
-      return badRequest(res, '文件名不能为空')
-    }
-    if (!fileType) {
-      return badRequest(res, '文件类型不能为空')
-    }
-    if (!fileUrl) {
-      return badRequest(res, '文件URL不能为空')
-    }
-
-    // 验证关联类型
-    const validTypes = ['log', 'project', 'work']
-    if (!validTypes.includes(relatedType)) {
-      return badRequest(res, '无效的关联类型')
-    }
-
-    // TODO: 这里应该实现实际的文件上传逻辑
-    // 1. 接收multipart/form-data文件
-    // 2. 上传到云存储（如腾讯云COS）
-    // 3. 获取文件URL
-    // 目前使用前端传递的fileUrl
-
-    // 保存附件记录
-    const result = await query(
-      `INSERT INTO attachments 
-        (related_type, related_id, file_name, file_type, file_url, file_size, upload_user_id) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [relatedType, relatedId, fileName, fileType, fileUrl, fileSize || 0, userId]
-    )
-
-    return success(res, {
-      id: result.insertId,
-      fileName,
-      fileType,
-      fileUrl,
-      fileSize: fileSize || 0
-    }, '上传成功')
-
-  } catch (error) {
-    console.error('上传附件错误:', error)
-    return serverError(res, '上传失败')
-  }
-})
-
-/**
  * 获取附件列表
  * GET /api/v1/attachments
  */
