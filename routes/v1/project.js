@@ -133,16 +133,6 @@ router.post('/projects', authenticate, async (req, res) => {
       return badRequest(res, '总监理工程师不能为空')
     }
 
-    // 检查项目编号是否已存在
-    const existing = await query(
-      'SELECT id FROM projects WHERE project_code = ?',
-      [projectCode]
-    )
-
-    if (existing.length > 0) {
-      return badRequest(res, '项目编号已存在')
-    }
-
     // 创建项目
     const result = await query(
       `INSERT INTO projects 
@@ -186,18 +176,6 @@ router.put('/projects/:id', authenticate, async (req, res) => {
 
     if (projects.length === 0) {
       return notFound(res, '项目不存在或无权操作')
-    }
-
-    // 如果修改了项目编号，检查是否重复
-    if (projectCode && projectCode !== projects[0].project_code) {
-      const existing = await query(
-        'SELECT id FROM projects WHERE project_code = ? AND id != ?',
-        [projectCode, id]
-      )
-
-      if (existing.length > 0) {
-        return badRequest(res, '项目编号已存在')
-      }
     }
 
     // 更新项目
