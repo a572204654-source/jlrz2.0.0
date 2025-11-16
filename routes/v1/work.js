@@ -165,16 +165,6 @@ router.post('/works', authenticate, async (req, res) => {
       return notFound(res, '项目不存在')
     }
 
-    // 检查工程编号是否已存在
-    const existing = await query(
-      'SELECT id FROM works WHERE work_code = ?',
-      [workCode]
-    )
-
-    if (existing.length > 0) {
-      return badRequest(res, '工程编号已存在')
-    }
-
     // 创建工程
     const result = await query(
       `INSERT INTO works 
@@ -217,18 +207,6 @@ router.put('/works/:id', authenticate, async (req, res) => {
 
     if (works.length === 0) {
       return notFound(res, '工程不存在或无权操作')
-    }
-
-    // 如果修改了工程编号，检查是否重复
-    if (workCode && workCode !== works[0].work_code) {
-      const existing = await query(
-        'SELECT id FROM works WHERE work_code = ? AND id != ?',
-        [workCode, id]
-      )
-
-      if (existing.length > 0) {
-        return badRequest(res, '工程编号已存在')
-      }
     }
 
     // 更新工程
