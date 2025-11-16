@@ -4,11 +4,14 @@
  */
 
 const mysql = require('mysql2/promise');
-const config = require('../config');
 
-// 使用配置文件中的数据库连接信息
+// 数据库连接配置
 const dbConfig = {
-  ...config.database,
+  host: 'sh-cynosdbmysql-grp-goudlu7k.sql.tencentcdb.com',
+  port: 22087,
+  user: 'a572204654',
+  password: '572204654aA',
+  database: 'jlzr1101-5g9kplxza13a780d',
   charset: 'utf8mb4'
 };
 
