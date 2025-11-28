@@ -70,19 +70,16 @@ router.post('/send', authenticate, async (req, res) => {
     )
 
     // 构建对话上下文（时间倒序，需要翻转）
-    // const conversationHistory = historyMessages
-    //   .reverse()
-    //   .filter(msg => msg.message_type === 'user' || msg.message_type === 'ai')
-    //   .map(msg => ({
-    //     role: msg.message_type === 'user' ? 'user' : 'assistant',
-    //     content: msg.content
-    //   }))
+    const conversationHistory = historyMessages
+      .reverse()
+      .filter(msg => msg.message_type === 'user' || msg.message_type === 'ai')
+      .map(msg => ({
+        role: msg.message_type === 'user' ? 'user' : 'assistant',
+        content: msg.content
+      }))
 
     // 调用豆包AI API获取回复（如果失败会自动返回模拟数据）
-    // const aiReply = await chatWithContext(conversationHistory, content)
-
-    // 暂时停用AI功能，返回固定消息
-    const aiReply = '人工客服暂未上线'
+    const aiReply = await chatWithContext(conversationHistory, content)
 
     // 保存AI回复
     const aiMessageResult = await query(

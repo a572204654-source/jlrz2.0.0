@@ -66,26 +66,23 @@ router.post('/ai-chat/send', authenticate, async (req, res) => {
     )
 
     // 构建对话上下文（时间倒序，需要翻转）
-    // const conversationHistory = historyMessages
-    //   .reverse()
-    //   .filter(msg => msg.message_type === 'user' || msg.message_type === 'ai')
-    //   .map(msg => ({
-    //     role: msg.message_type === 'user' ? 'user' : 'assistant',
-    //     content: msg.content
-    //   }))
+    const conversationHistory = historyMessages
+      .reverse()
+      .filter(msg => msg.message_type === 'user' || msg.message_type === 'ai')
+      .map(msg => ({
+        role: msg.message_type === 'user' ? 'user' : 'assistant',
+        content: msg.content
+      }))
 
     // 调用豆包AI API获取回复
-    // let aiReply
-    // try {
-    //   aiReply = await chatWithContext(conversationHistory, content)
-    // } catch (error) {
-    //   console.error('豆包API调用失败:', error.message)
-    //   // 如果API调用失败，返回友好的错误提示
-    //   aiReply = `抱歉，AI服务暂时无法响应。错误信息：${error.message}`
-    // }
-
-    // 暂时停用AI功能，返回固定消息
-    const aiReply = '人工客服暂未上线'
+    let aiReply
+    try {
+      aiReply = await chatWithContext(conversationHistory, content)
+    } catch (error) {
+      console.error('豆包API调用失败:', error.message)
+      // 如果API调用失败，返回友好的错误提示
+      aiReply = `抱歉，AI服务暂时无法响应。错误信息：${error.message}`
+    }
 
     // 保存AI回复
     const aiMessageResult = await query(
