@@ -272,7 +272,7 @@ async function generateSupervisionLogWord(logData) {
 
         // 封面主表格
         new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
+          width: { size: 8800, type: WidthType.DXA },
           borders: tableBorders,
           rows: [
             // 项目名称
@@ -485,7 +485,7 @@ async function generateSupervisionLogWord(logData) {
 
         // 日志内容表格
         new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
+          width: { size: 9800, type: WidthType.DXA },
           borders: tableBorders,
           rows: [
             // 单位工程名称 + 单位工程编号
