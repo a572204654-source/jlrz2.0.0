@@ -38,6 +38,7 @@ router.get('/', authenticate, async (req, res) => {
         p.project_code,
         p.organization,
         p.chief_engineer,
+        p.specialist_engineer,
         p.description,
         p.address,
         p.start_date,
@@ -61,6 +62,7 @@ router.get('/', authenticate, async (req, res) => {
       projectCode: p.project_code,
       organization: p.organization,
       chiefEngineer: p.chief_engineer,
+      specialistEngineer: p.specialist_engineer,
       description: p.description,
       address: p.address,
       startDate: p.start_date,
@@ -108,6 +110,7 @@ router.get('/:id', authenticate, async (req, res) => {
         p.project_code,
         p.organization,
         p.chief_engineer,
+        p.specialist_engineer,
         p.description,
         p.address,
         p.start_date,
@@ -135,6 +138,7 @@ router.get('/:id', authenticate, async (req, res) => {
       projectCode: p.project_code,
       organization: p.organization,
       chiefEngineer: p.chief_engineer,
+      specialistEngineer: p.specialist_engineer,
       description: p.description,
       address: p.address,
       startDate: p.start_date,
@@ -161,6 +165,7 @@ router.get('/:id', authenticate, async (req, res) => {
  * - projectCode: 项目编号（必填）
  * - organization: 监理机构（必填）
  * - chiefEngineer: 总监理工程师（必填）
+ * - specialistEngineer: 专业监理工程师
  * - description: 项目描述
  * - address: 项目地址
  * - startDate: 开始日期
@@ -174,6 +179,7 @@ router.post('/', authenticate, async (req, res) => {
       projectCode,
       organization,
       chiefEngineer,
+      specialistEngineer,
       description,
       address,
       startDate,
@@ -197,9 +203,9 @@ router.post('/', authenticate, async (req, res) => {
     // 创建项目
     const result = await query(
       `INSERT INTO projects 
-        (project_name, project_code, organization, chief_engineer, description, address, start_date, end_date, creator_id) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [projectName, projectCode, organization, chiefEngineer, description || '', address || '', startDate || null, endDate || null, userId]
+        (project_name, project_code, organization, chief_engineer, specialist_engineer, description, address, start_date, end_date, creator_id) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [projectName, projectCode, organization, chiefEngineer, specialistEngineer || '', description || '', address || '', startDate || null, endDate || null, userId]
     )
 
     return success(res, { id: result.insertId }, '创建成功')
@@ -219,6 +225,7 @@ router.post('/', authenticate, async (req, res) => {
  * - projectCode: 项目编号
  * - organization: 监理机构
  * - chiefEngineer: 总监理工程师
+ * - specialistEngineer: 专业监理工程师
  * - description: 项目描述
  * - address: 项目地址
  * - startDate: 开始日期
@@ -233,6 +240,7 @@ router.put('/:id', authenticate, async (req, res) => {
       projectCode,
       organization,
       chiefEngineer,
+      specialistEngineer,
       description,
       address,
       startDate,
@@ -256,13 +264,14 @@ router.put('/:id', authenticate, async (req, res) => {
         project_code = COALESCE(?, project_code),
         organization = COALESCE(?, organization),
         chief_engineer = COALESCE(?, chief_engineer),
+        specialist_engineer = COALESCE(?, specialist_engineer),
         description = COALESCE(?, description),
         address = COALESCE(?, address),
         start_date = COALESCE(?, start_date),
         end_date = COALESCE(?, end_date),
         updated_at = NOW()
       WHERE id = ?`,
-      [projectName ?? null, projectCode ?? null, organization ?? null, chiefEngineer ?? null, 
+      [projectName ?? null, projectCode ?? null, organization ?? null, chiefEngineer ?? null, specialistEngineer ?? null,
        description ?? null, address ?? null, startDate ?? null, endDate ?? null, id]
     )
 
