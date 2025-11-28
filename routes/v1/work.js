@@ -97,6 +97,7 @@ router.get('/works/:id', authenticate, async (req, res) => {
         w.description,
         p.organization,
         p.chief_engineer as chiefEngineer,
+        p.specialist_engineer as specialistEngineer,
         w.created_at as createdAt,
         COALESCE(COUNT(sl.id), 0) as logCount
        FROM works w
