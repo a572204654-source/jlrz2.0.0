@@ -18,7 +18,7 @@ router.use('/user', userRouter)
 router.use('/projects', projectRouter)
 router.use('/works', workRouter)
 router.use('/supervision-logs', supervisionLogRouter)
-router.use('/ai/chat', aiChatRouter)
+router.use('/ai/chat', aiChatRouter)  // AI聊天API（支持文件上传、多模态）
 router.use('/ai', aiProviderRouter)
 router.use('/attachments', attachmentRouter)
 router.use('/weather', weatherRouter)
@@ -45,7 +45,7 @@ router.get('/', (req, res) => {
       projects: '/api/projects - 项目相关接口',
       works: '/api/works - 工程相关接口',
       supervisionLogs: '/api/supervision-logs - 监理日志相关接口',
-      aiChat: '/api/ai/chat/* - AI助手对话相关接口',
+      aiChat: '/api/ai/chat/* - AI聊天（支持文件上传、多模态）',
       aiProvider: '/api/ai/provider-key - AI提供商密钥接口',
       attachments: '/api/attachments - 附件相关接口',
       weather: '/api/weather/current - 气象相关接口'

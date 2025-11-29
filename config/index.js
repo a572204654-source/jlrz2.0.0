@@ -9,14 +9,14 @@ module.exports = {
 
   // 数据库配置
   database: {
-    // 根据环境自动选择内网或外网地址
-    // 云托管环境(production)使用内网，本地开发(development)使用外网
-    host: process.env.NODE_ENV === 'production' 
+    // 支持直接配置或根据环境自动选择
+    // 优先使用 DB_HOST，否则根据环境选择内外网地址
+    host: process.env.DB_HOST || (process.env.NODE_ENV === 'production' 
       ? (process.env.DB_HOST_INTERNAL || '10.27.100.151')
-      : (process.env.DB_HOST_EXTERNAL || 'sh-cynosdbmysql-grp-goudlu7k.sql.tencentcdb.com'),
-    port: process.env.NODE_ENV === 'production'
-      ? parseInt(process.env.DB_PORT_INTERNAL || '3306')
-      : parseInt(process.env.DB_PORT_EXTERNAL || '22087'),
+      : (process.env.DB_HOST_EXTERNAL || 'sh-cynosdbmysql-grp-goudlu7k.sql.tencentcdb.com')),
+    port: parseInt(process.env.DB_PORT || (process.env.NODE_ENV === 'production'
+      ? (process.env.DB_PORT_INTERNAL || '3306')
+      : (process.env.DB_PORT_EXTERNAL || '22087'))),
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || 'express_miniapp',
@@ -48,9 +48,15 @@ module.exports = {
   doubao: {
     apiKey: process.env.DOUBAO_API_KEY || '',
     endpointId: process.env.DOUBAO_ENDPOINT_ID || '',  // 推理接入点ID
+    visionEndpointId: process.env.DOUBAO_VISION_ENDPOINT_ID || '', // 视觉模型接入点ID（可选）
+    model: process.env.DOUBAO_MODEL || '',  // 模型名称
     apiUrl: process.env.DOUBAO_API_URL || 'https://ark.cn-beijing.volces.com/api/v3',
     maxTokens: 2048,
-    temperature: 0.8
+    temperature: 0.8,
+    // 函数调用配置
+    enableFunctionCalling: process.env.DOUBAO_ENABLE_FUNCTION_CALLING === 'true',
+    webpagePluginId: process.env.DOUBAO_WEBPAGE_PLUGIN_ID || '',
+    webpagePluginFunction: process.env.DOUBAO_WEBPAGE_PLUGIN_FUNCTION || ''
   },
 
   // 服务配置

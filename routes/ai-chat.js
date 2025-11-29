@@ -1,28 +1,62 @@
+/**
+ * AI聊天功能 v2 - 完整重写版本
+ * 
+ * 功能：
+ * 1. 会话管理（创建、列表、删除、重命名）
+ * 2. 聊天记录保存与加载
+ * 3. 支持文件上传（图片、文档）
+ * 4. 多模态对话（图片识别）
+ */
+
 const express = require('express')
 const router = express.Router()
-const { success, badRequest, serverError } = require('../utils/response')
+const { success, badRequest, serverError, notFound } = require('../utils/response')
 const { query } = require('../config/database')
 const { authenticate } = require('../middleware/auth')
 const { randomString } = require('../utils/crypto')
-const { chatWithContext } = require('../utils/doubao')
+const { chatWithContext, chatWithImages, readImageAsBase64 } = require('../utils/doubao')
+const { 
+  aiChatUpload, 
+  processUploadedFile, 
+  deleteFile, 
+  getFilePathFromUrl,
+  isImageForAI 
+} = require('../utils/file-upload')
+
+// ============================================================================
+// 会话管理 API
+// ============================================================================
 
 /**
  * 创建新会话
- * POST /api/ai-chat/session
+ * POST /api/ai-chat-v2/sessions
+ * 
+ * 请求体：
+ * - title: 会话标题（可选，默认"新对话"）
  */
-router.post('/session', authenticate, async (req, res) => {
+router.post('/sessions', authenticate, async (req, res) => {
   try {
-    // 生成会话ID
-    const sessionId = 'sess_' + Date.now() + '_' + randomString(8)
-    const createTime = new Date().toISOString()
+    const userId = req.userId
+    const { title = '新对话' } = req.body
 
-    // 可以选择性地在数据库中记录会话创建
-    // 目前仅返回会话ID和创建时间
-    
-    return success(res, { 
+    // 生成唯一会话ID
+    const sessionId = 'chat_' + Date.now() + '_' + randomString(12)
+
+    // 创建会话记录
+    const result = await query(
+      `INSERT INTO ai_chat_sessions 
+        (session_id, user_id, title, message_count, created_at, updated_at) 
+       VALUES (?, ?, ?, 0, NOW(), NOW())`,
+      [sessionId, userId, title]
+    )
+
+    return success(res, {
+      id: result.insertId,
       sessionId,
-      createTime
-    })
+      title,
+      messageCount: 0,
+      createdAt: new Date().toISOString()
+    }, '会话创建成功')
 
   } catch (error) {
     console.error('创建会话错误:', error)
@@ -31,152 +65,170 @@ router.post('/session', authenticate, async (req, res) => {
 })
 
 /**
- * 发送消息
- * POST /api/ai-chat/send
+ * 获取会话列表
+ * GET /api/ai-chat-v2/sessions
  * 
- * 请求参数:
- * - sessionId: 会话ID（必填）
- * - content: 消息内容（必填）
+ * 查询参数：
+ * - page: 页码（默认1）
+ * - pageSize: 每页数量（默认20）
+ * - keyword: 搜索关键词（可选）
  */
-router.post('/send', authenticate, async (req, res) => {
+router.get('/sessions', authenticate, async (req, res) => {
   try {
     const userId = req.userId
-    const { sessionId, content } = req.body
+    const page = parseInt(req.query.page) || 1
+    const pageSize = Math.min(parseInt(req.query.pageSize) || 20, 100)
+    const keyword = req.query.keyword || ''
+    const offset = (page - 1) * pageSize
 
-    // 参数验证
-    if (!sessionId) {
-      return badRequest(res, '会话ID不能为空')
-    }
-    if (!content) {
-      return badRequest(res, '消息内容不能为空')
+    let whereClause = 'WHERE user_id = ? AND is_archived = 0'
+    const params = [userId]
+
+    // 关键词搜索
+    if (keyword) {
+      whereClause += ' AND (title LIKE ? OR last_message LIKE ?)'
+      params.push(`%${keyword}%`, `%${keyword}%`)
     }
 
-    // 保存用户消息
-    const userMessageResult = await query(
-      `INSERT INTO ai_chat_logs 
-        (user_id, session_id, message_type, content, api_provider) 
-       VALUES (?, ?, 'user', ?, 'doubao')`,
-      [userId, sessionId, content]
+    // 查询会话列表
+    const sessions = await query(
+      `SELECT 
+        id,
+        session_id as sessionId,
+        title,
+        last_message as lastMessage,
+        message_count as messageCount,
+        DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') as createdAt,
+        DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s') as updatedAt
+       FROM ai_chat_sessions
+       ${whereClause}
+       ORDER BY updated_at DESC
+       LIMIT ? OFFSET ?`,
+      [...params, pageSize, offset]
     )
 
-    // 获取对话历史（最近10条消息作为上下文）
-    const historyMessages = await query(
-      `SELECT message_type, content 
-       FROM ai_chat_logs
-       WHERE user_id = ? AND session_id = ?
-       ORDER BY created_at DESC
-       LIMIT 10`,
-      [userId, sessionId]
-    )
-
-    // 构建对话上下文（时间倒序，需要翻转）
-    const conversationHistory = historyMessages
-      .reverse()
-      .filter(msg => msg.message_type === 'user' || msg.message_type === 'ai')
-      .map(msg => ({
-        role: msg.message_type === 'user' ? 'user' : 'assistant',
-        content: msg.content
-      }))
-
-    // 调用豆包AI API获取回复（如果失败会自动返回模拟数据）
-    const aiReply = await chatWithContext(conversationHistory, content)
-
-    // 保存AI回复
-    const aiMessageResult = await query(
-      `INSERT INTO ai_chat_logs 
-        (user_id, session_id, message_type, content, api_provider) 
-       VALUES (?, ?, 'ai', ?, 'doubao')`,
-      [userId, sessionId, aiReply]
+    // 查询总数
+    const [countResult] = await query(
+      `SELECT COUNT(*) as total FROM ai_chat_sessions ${whereClause}`,
+      params
     )
 
     return success(res, {
-      aiReply,
-      messageId: aiMessageResult.insertId.toString(),
-      timestamp: new Date().toISOString()
+      list: sessions,
+      total: countResult.total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(countResult.total / pageSize)
     })
 
   } catch (error) {
-    console.error('发送消息错误:', error)
-    return serverError(res, '发送消息失败')
+    console.error('获取会话列表错误:', error)
+    return serverError(res, '获取会话列表失败')
   }
 })
 
 /**
- * 获取对话历史
- * GET /api/ai-chat/history
- * 
- * 请求参数:
- * - sessionId: 会话ID（必填）
- * - page: 页码，默认1
- * - pageSize: 每页数量，默认50
+ * 获取会话详情
+ * GET /api/ai-chat-v2/sessions/:sessionId
  */
-router.get('/history', authenticate, async (req, res) => {
+router.get('/sessions/:sessionId', authenticate, async (req, res) => {
   try {
     const userId = req.userId
-    const sessionId = req.query.sessionId
-    const page = parseInt(req.query.page) || 1
-    const pageSize = parseInt(req.query.pageSize) || 50
-    const offset = (page - 1) * pageSize
+    const { sessionId } = req.params
 
-    // 参数验证
-    if (!sessionId) {
-      return badRequest(res, '会话ID不能为空')
-    }
-
-    // 查询对话历史
-    const messages = await query(
+    const sessions = await query(
       `SELECT 
         id,
-        message_type,
-        content,
-        created_at
-       FROM ai_chat_logs
-       WHERE user_id = ? AND session_id = ?
-       ORDER BY created_at ASC
-       LIMIT ${pageSize} OFFSET ${offset}`,
-      [userId, sessionId]
+        session_id as sessionId,
+        title,
+        last_message as lastMessage,
+        message_count as messageCount,
+        is_archived as isArchived,
+        DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') as createdAt,
+        DATE_FORMAT(updated_at, '%Y-%m-%d %H:%i:%s') as updatedAt
+       FROM ai_chat_sessions
+       WHERE session_id = ? AND user_id = ?`,
+      [sessionId, userId]
     )
 
-    // 转换为文档要求的格式
-    const formattedMessages = messages.map(msg => ({
-      type: msg.message_type,
-      content: msg.content,
-      timestamp: msg.created_at
-    }))
+    if (sessions.length === 0) {
+      return notFound(res, '会话不存在')
+    }
 
-    // 查询总数
-    const [countResult] = await query(
-      'SELECT COUNT(*) as total FROM ai_chat_logs WHERE user_id = ? AND session_id = ?',
-      [userId, sessionId]
-    )
-
-    return success(res, {
-      messages: formattedMessages,
-      total: countResult.total,
-      page,
-      pageSize
-    })
+    return success(res, sessions[0])
 
   } catch (error) {
-    console.error('获取对话历史错误:', error)
-    return serverError(res, '获取对话历史失败')
+    console.error('获取会话详情错误:', error)
+    return serverError(res, '获取会话详情失败')
+  }
+})
+
+/**
+ * 更新会话（重命名）
+ * PUT /api/ai-chat-v2/sessions/:sessionId
+ * 
+ * 请求体：
+ * - title: 新标题
+ */
+router.put('/sessions/:sessionId', authenticate, async (req, res) => {
+  try {
+    const userId = req.userId
+    const { sessionId } = req.params
+    const { title } = req.body
+
+    if (!title || title.trim().length === 0) {
+      return badRequest(res, '会话标题不能为空')
+    }
+
+    const result = await query(
+      `UPDATE ai_chat_sessions 
+       SET title = ?, updated_at = NOW() 
+       WHERE session_id = ? AND user_id = ?`,
+      [title.trim(), sessionId, userId]
+    )
+
+    if (result.affectedRows === 0) {
+      return notFound(res, '会话不存在')
+    }
+
+    return success(res, { sessionId, title: title.trim() }, '更新成功')
+
+  } catch (error) {
+    console.error('更新会话错误:', error)
+    return serverError(res, '更新会话失败')
   }
 })
 
 /**
  * 删除会话
- * DELETE /api/ai-chat/session/:sessionId
+ * DELETE /api/ai-chat-v2/sessions/:sessionId
  */
-router.delete('/session/:sessionId', authenticate, async (req, res) => {
+router.delete('/sessions/:sessionId', authenticate, async (req, res) => {
   try {
     const userId = req.userId
     const { sessionId } = req.params
 
-    // 删除会话的所有消息
+    // 先删除会话的所有消息
     await query(
-      'DELETE FROM ai_chat_logs WHERE user_id = ? AND session_id = ?',
-      [userId, sessionId]
+      'DELETE FROM ai_chat_logs WHERE session_id = ? AND user_id = ?',
+      [sessionId, userId]
     )
+
+    // 删除会话相关附件记录
+    await query(
+      'DELETE FROM ai_chat_attachments WHERE session_id = ? AND user_id = ?',
+      [sessionId, userId]
+    )
+
+    // 删除会话
+    const result = await query(
+      'DELETE FROM ai_chat_sessions WHERE session_id = ? AND user_id = ?',
+      [sessionId, userId]
+    )
+
+    if (result.affectedRows === 0) {
+      return notFound(res, '会话不存在')
+    }
 
     return success(res, {}, '删除成功')
 
@@ -187,69 +239,454 @@ router.delete('/session/:sessionId', authenticate, async (req, res) => {
 })
 
 /**
- * 获取用户的会话列表
- * GET /api/ai-chat/sessions
- * 
- * 请求参数:
- * - page: 页码，默认1
- * - pageSize: 每页数量，默认20
+ * 清空所有会话
+ * DELETE /api/ai-chat-v2/sessions
  */
-router.get('/sessions', authenticate, async (req, res) => {
+router.delete('/sessions', authenticate, async (req, res) => {
   try {
     const userId = req.userId
-    const page = parseInt(req.query.page) || 1
-    const pageSize = parseInt(req.query.pageSize) || 20
-    const offset = (page - 1) * pageSize
 
-    // 查询会话列表（按最后消息时间分组）
-    const sessions = await query(
-      `SELECT 
-        session_id,
-        MIN(created_at) as create_time,
-        MAX(created_at) as update_time,
-        (SELECT content FROM ai_chat_logs 
-         WHERE user_id = ? AND session_id = acl.session_id
-         ORDER BY created_at DESC LIMIT 1) as last_message,
-        (SELECT content FROM ai_chat_logs 
-         WHERE user_id = ? AND session_id = acl.session_id AND message_type = 'user'
-         ORDER BY created_at ASC LIMIT 1) as first_user_message
-       FROM ai_chat_logs acl
-       WHERE user_id = ?
-       GROUP BY session_id
-       ORDER BY MAX(created_at) DESC
-       LIMIT ${pageSize} OFFSET ${offset}`,
-      [userId, userId, userId]
+    // 删除所有消息
+    await query('DELETE FROM ai_chat_logs WHERE user_id = ?', [userId])
+
+    // 删除所有附件记录
+    await query('DELETE FROM ai_chat_attachments WHERE user_id = ?', [userId])
+
+    // 删除所有会话
+    const result = await query(
+      'DELETE FROM ai_chat_sessions WHERE user_id = ?',
+      [userId]
     )
 
-    // 转换为文档要求的格式
-    const formattedSessions = sessions.map(s => ({
-      sessionId: s.session_id,
-      title: s.first_user_message ? s.first_user_message.substring(0, 20) + (s.first_user_message.length > 20 ? '...' : '') : '新会话',
-      lastMessage: s.last_message,
-      updateTime: s.update_time,
-      createTime: s.create_time
+    return success(res, { deletedCount: result.affectedRows }, '清空成功')
+
+  } catch (error) {
+    console.error('清空会话错误:', error)
+    return serverError(res, '清空会话失败')
+  }
+})
+
+// ============================================================================
+// 消息 API
+// ============================================================================
+
+/**
+ * 发送消息（支持附件）
+ * POST /api/ai-chat-v2/messages
+ * 
+ * 请求体：
+ * - sessionId: 会话ID（必填）
+ * - content: 消息内容（必填）
+ * - attachmentIds: 附件ID数组（可选）
+ */
+router.post('/messages', authenticate, async (req, res) => {
+  try {
+    const userId = req.userId
+    const { sessionId, content, attachmentIds = [] } = req.body
+
+    // 参数验证
+    if (!sessionId) {
+      return badRequest(res, '会话ID不能为空')
+    }
+    if (!content && attachmentIds.length === 0) {
+      return badRequest(res, '消息内容不能为空')
+    }
+
+    // 验证会话存在性，如果不存在则自动创建
+    let session = await query(
+      'SELECT * FROM ai_chat_sessions WHERE session_id = ? AND user_id = ?',
+      [sessionId, userId]
+    )
+
+    if (session.length === 0) {
+      // 自动创建会话
+      const title = content ? content.substring(0, 20) + (content.length > 20 ? '...' : '') : '新对话'
+      await query(
+        `INSERT INTO ai_chat_sessions 
+          (session_id, user_id, title, message_count, created_at, updated_at) 
+         VALUES (?, ?, ?, 0, NOW(), NOW())`,
+        [sessionId, userId, title]
+      )
+    }
+
+    // 处理附件
+    let attachments = []
+    let images = []
+    
+    if (attachmentIds.length > 0) {
+      const placeholders = attachmentIds.map(() => '?').join(',')
+      attachments = await query(
+        `SELECT * FROM ai_chat_attachments 
+         WHERE id IN (${placeholders}) AND user_id = ?`,
+        [...attachmentIds, userId]
+      )
+
+      // 提取图片附件用于多模态对话
+      for (const att of attachments) {
+        if (isImageForAI(att.mime_type)) {
+          try {
+            const filePath = getFilePathFromUrl(att.file_url)
+            if (filePath) {
+              const imageData = await readImageAsBase64(filePath)
+              images.push(imageData)
+            }
+          } catch (e) {
+            console.error('读取图片失败:', e)
+          }
+        }
+      }
+    }
+
+    // 保存用户消息
+    const attachmentsJson = attachments.length > 0 
+      ? JSON.stringify(attachments.map(a => ({
+          id: a.id,
+          fileName: a.file_name,
+          fileType: a.file_type,
+          fileUrl: a.file_url
+        })))
+      : null
+
+    const userMsgResult = await query(
+      `INSERT INTO ai_chat_logs 
+        (user_id, session_id, message_type, content, attachments, api_provider, created_at) 
+       VALUES (?, ?, 'user', ?, ?, 'doubao', NOW())`,
+      [userId, sessionId, content || '', attachmentsJson]
+    )
+
+    // 更新附件的message_id
+    if (attachmentIds.length > 0) {
+      const placeholders = attachmentIds.map(() => '?').join(',')
+      await query(
+        `UPDATE ai_chat_attachments SET message_id = ? WHERE id IN (${placeholders})`,
+        [userMsgResult.insertId, ...attachmentIds]
+      )
+    }
+
+    // 获取对话历史（最近10轮对话）
+    const historyMessages = await query(
+      `SELECT message_type, content 
+       FROM ai_chat_logs
+       WHERE user_id = ? AND session_id = ?
+       ORDER BY created_at DESC
+       LIMIT 20`,
+      [userId, sessionId]
+    )
+
+    // 构建对话上下文
+    const conversationHistory = historyMessages
+      .reverse()
+      .filter(msg => msg.message_type === 'user' || msg.message_type === 'ai')
+      .slice(0, -1) // 排除刚刚插入的用户消息
+      .map(msg => ({
+        role: msg.message_type === 'user' ? 'user' : 'assistant',
+        content: msg.content
+      }))
+
+    // 调用AI API
+    let aiReply
+    if (images.length > 0) {
+      // 有图片，使用多模态对话
+      aiReply = await chatWithImages(conversationHistory, content || '请描述这张图片', images)
+    } else {
+      // 纯文本对话
+      aiReply = await chatWithContext(conversationHistory, content)
+    }
+
+    // 保存AI回复
+    const aiMsgResult = await query(
+      `INSERT INTO ai_chat_logs 
+        (user_id, session_id, message_type, content, api_provider, created_at) 
+       VALUES (?, ?, 'ai', ?, 'doubao', NOW())`,
+      [userId, sessionId, aiReply]
+    )
+
+    // 更新会话信息
+    const previewMessage = aiReply.substring(0, 100)
+    await query(
+      `UPDATE ai_chat_sessions 
+       SET last_message = ?, 
+           message_count = message_count + 2,
+           updated_at = NOW()
+       WHERE session_id = ? AND user_id = ?`,
+      [previewMessage, sessionId, userId]
+    )
+
+    // 如果是首条消息，用用户消息更新会话标题
+    if (!session.length || session[0].message_count === 0) {
+      const newTitle = content ? content.substring(0, 30) + (content.length > 30 ? '...' : '') : '新对话'
+      await query(
+        `UPDATE ai_chat_sessions SET title = ? WHERE session_id = ? AND user_id = ? AND title = '新对话'`,
+        [newTitle, sessionId, userId]
+      )
+    }
+
+    return success(res, {
+      userMessage: {
+        id: userMsgResult.insertId,
+        type: 'user',
+        content: content || '',
+        attachments: attachments.map(a => ({
+          id: a.id,
+          fileName: a.file_name,
+          fileType: a.file_type,
+          fileUrl: a.file_url
+        })),
+        timestamp: new Date().toISOString()
+      },
+      aiMessage: {
+        id: aiMsgResult.insertId,
+        type: 'ai',
+        content: aiReply,
+        timestamp: new Date().toISOString()
+      }
+    })
+
+  } catch (error) {
+    console.error('发送消息错误:', error)
+    return serverError(res, '发送消息失败')
+  }
+})
+
+/**
+ * 获取消息历史
+ * GET /api/ai-chat-v2/messages
+ * 
+ * 查询参数：
+ * - sessionId: 会话ID（必填）
+ * - page: 页码（默认1）
+ * - pageSize: 每页数量（默认50）
+ */
+router.get('/messages', authenticate, async (req, res) => {
+  try {
+    const userId = req.userId
+    const sessionId = req.query.sessionId
+    const page = parseInt(req.query.page) || 1
+    const pageSize = Math.min(parseInt(req.query.pageSize) || 50, 100)
+    const offset = (page - 1) * pageSize
+
+    if (!sessionId) {
+      return badRequest(res, '会话ID不能为空')
+    }
+
+    // 查询消息列表
+    const messages = await query(
+      `SELECT 
+        id,
+        message_type as type,
+        content,
+        attachments,
+        DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') as timestamp
+       FROM ai_chat_logs
+       WHERE user_id = ? AND session_id = ?
+       ORDER BY created_at ASC
+       LIMIT ? OFFSET ?`,
+      [userId, sessionId, pageSize, offset]
+    )
+
+    // 处理附件JSON
+    const formattedMessages = messages.map(msg => ({
+      ...msg,
+      attachments: msg.attachments ? JSON.parse(msg.attachments) : []
     }))
 
     // 查询总数
     const [countResult] = await query(
-      `SELECT COUNT(DISTINCT session_id) as total 
-       FROM ai_chat_logs 
-       WHERE user_id = ?`,
-      [userId]
+      'SELECT COUNT(*) as total FROM ai_chat_logs WHERE user_id = ? AND session_id = ?',
+      [userId, sessionId]
     )
 
     return success(res, {
-      sessions: formattedSessions,
+      sessionId,
+      list: formattedMessages,
       total: countResult.total,
       page,
-      pageSize
+      pageSize,
+      totalPages: Math.ceil(countResult.total / pageSize)
     })
 
   } catch (error) {
-    console.error('获取会话列表错误:', error)
-    return serverError(res, '获取会话列表失败')
+    console.error('获取消息历史错误:', error)
+    return serverError(res, '获取消息历史失败')
   }
 })
 
-module.exports = router
+/**
+ * 删除单条消息
+ * DELETE /api/ai-chat-v2/messages/:messageId
+ */
+router.delete('/messages/:messageId', authenticate, async (req, res) => {
+  try {
+    const userId = req.userId
+    const { messageId } = req.params
 
+    const result = await query(
+      'DELETE FROM ai_chat_logs WHERE id = ? AND user_id = ?',
+      [messageId, userId]
+    )
+
+    if (result.affectedRows === 0) {
+      return notFound(res, '消息不存在')
+    }
+
+    return success(res, {}, '删除成功')
+
+  } catch (error) {
+    console.error('删除消息错误:', error)
+    return serverError(res, '删除消息失败')
+  }
+})
+
+// ============================================================================
+// 文件上传 API
+// ============================================================================
+
+/**
+ * 上传文件（支持多文件）
+ * POST /api/ai-chat-v2/upload
+ * 
+ * FormData:
+ * - files: 文件数组（最多9个）
+ * - sessionId: 会话ID（可选）
+ */
+router.post('/upload', authenticate, aiChatUpload.array('files', 9), async (req, res) => {
+  try {
+    const userId = req.userId
+    const sessionId = req.body.sessionId || ''
+    const files = req.files
+
+    if (!files || files.length === 0) {
+      return badRequest(res, '请选择要上传的文件')
+    }
+
+    const uploadedFiles = []
+
+    for (const file of files) {
+      const fileInfo = processUploadedFile(file, req)
+      
+      // 保存附件记录
+      const result = await query(
+        `INSERT INTO ai_chat_attachments 
+          (session_id, user_id, file_name, file_type, mime_type, file_url, file_size, created_at) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [sessionId, userId, fileInfo.fileName, fileInfo.fileType, fileInfo.mimeType, fileInfo.fileUrl, fileInfo.fileSize]
+      )
+
+      uploadedFiles.push({
+        id: result.insertId,
+        fileName: fileInfo.fileName,
+        fileType: fileInfo.fileType,
+        mimeType: fileInfo.mimeType,
+        fileUrl: fileInfo.fileUrl,
+        fileSize: fileInfo.fileSize
+      })
+    }
+
+    return success(res, {
+      files: uploadedFiles,
+      count: uploadedFiles.length
+    }, '上传成功')
+
+  } catch (error) {
+    console.error('文件上传错误:', error)
+    
+    // 处理Multer错误
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return badRequest(res, '文件大小超出限制')
+    }
+    if (error.code === 'LIMIT_FILE_COUNT') {
+      return badRequest(res, '文件数量超出限制（最多9个）')
+    }
+    if (error.message && error.message.includes('不支持的文件类型')) {
+      return badRequest(res, error.message)
+    }
+    
+    return serverError(res, '文件上传失败')
+  }
+})
+
+/**
+ * 获取会话的附件列表
+ * GET /api/ai-chat-v2/attachments
+ * 
+ * 查询参数：
+ * - sessionId: 会话ID（必填）
+ */
+router.get('/attachments', authenticate, async (req, res) => {
+  try {
+    const userId = req.userId
+    const sessionId = req.query.sessionId
+
+    if (!sessionId) {
+      return badRequest(res, '会话ID不能为空')
+    }
+
+    const attachments = await query(
+      `SELECT 
+        id,
+        file_name as fileName,
+        file_type as fileType,
+        mime_type as mimeType,
+        file_url as fileUrl,
+        file_size as fileSize,
+        DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') as createdAt
+       FROM ai_chat_attachments
+       WHERE session_id = ? AND user_id = ?
+       ORDER BY created_at DESC`,
+      [sessionId, userId]
+    )
+
+    return success(res, { list: attachments })
+
+  } catch (error) {
+    console.error('获取附件列表错误:', error)
+    return serverError(res, '获取附件列表失败')
+  }
+})
+
+/**
+ * 删除附件
+ * DELETE /api/ai-chat-v2/attachments/:attachmentId
+ */
+router.delete('/attachments/:attachmentId', authenticate, async (req, res) => {
+  try {
+    const userId = req.userId
+    const { attachmentId } = req.params
+
+    // 查询附件信息
+    const attachments = await query(
+      'SELECT * FROM ai_chat_attachments WHERE id = ? AND user_id = ?',
+      [attachmentId, userId]
+    )
+
+    if (attachments.length === 0) {
+      return notFound(res, '附件不存在')
+    }
+
+    const attachment = attachments[0]
+
+    // 删除物理文件
+    const filePath = getFilePathFromUrl(attachment.file_url)
+    if (filePath) {
+      await deleteFile(filePath)
+    }
+
+    // 删除数据库记录
+    await query(
+      'DELETE FROM ai_chat_attachments WHERE id = ?',
+      [attachmentId]
+    )
+
+    return success(res, {}, '删除成功')
+
+  } catch (error) {
+    console.error('删除附件错误:', error)
+    return serverError(res, '删除附件失败')
+  }
+})
+
+// ============================================================================
+// 导出
+// ============================================================================
+
+module.exports = router
