@@ -2,6 +2,7 @@ const axios = require('axios')
 const fs = require('fs')
 const path = require('path')
 const mammoth = require('mammoth')
+const pdfParse = require('pdf-parse')
 const config = require('../config')
 
 /**
@@ -381,6 +382,22 @@ async function parseTxtFile(filePath) {
 }
 
 /**
+ * 解析PDF文件内容
+ * @param {string} filePath - 文件路径
+ * @returns {Promise<string>} PDF文本内容
+ */
+async function parsePdfFile(filePath) {
+  try {
+    const dataBuffer = fs.readFileSync(filePath)
+    const data = await pdfParse(dataBuffer)
+    return data.text.trim()
+  } catch (error) {
+    console.error('解析PDF文件失败:', error.message)
+    return null
+  }
+}
+
+/**
  * 根据文件类型解析文档内容
  * @param {string} filePath - 文件路径
  * @param {string} mimeType - MIME类型
@@ -396,14 +413,14 @@ async function parseDocumentContent(filePath, mimeType) {
     return await parseDocxFile(filePath)
   }
   
+  // PDF文件
+  if (mimeType.includes('pdf') || filePath.endsWith('.pdf')) {
+    return await parsePdfFile(filePath)
+  }
+  
   // 纯文本文件
   if (mimeType.includes('text') || filePath.endsWith('.txt') || filePath.endsWith('.md')) {
     return await parseTxtFile(filePath)
-  }
-  
-  // PDF暂不支持（需要额外库）
-  if (mimeType.includes('pdf')) {
-    return '[PDF文件暂不支持解析，请上传Word文档或文本文件]'
   }
   
   return null
@@ -421,6 +438,7 @@ module.exports = {
   readImageAsBase64,
   parseDocxFile,
   parseTxtFile,
+  parsePdfFile,
   parseDocumentContent
 }
 
