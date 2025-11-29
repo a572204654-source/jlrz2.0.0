@@ -1,6 +1,7 @@
 const axios = require('axios')
 const fs = require('fs')
 const path = require('path')
+const mammoth = require('mammoth')
 const config = require('../config')
 
 /**
@@ -349,6 +350,65 @@ async function getAISuggestion(question, context = '') {
   return await callDoubaoAPI(messages)
 }
 
+/**
+ * 解析DOCX文件内容
+ * @param {string} filePath - 文件路径
+ * @returns {Promise<string>} 文档文本内容
+ */
+async function parseDocxFile(filePath) {
+  try {
+    const result = await mammoth.extractRawText({ path: filePath })
+    return result.value.trim()
+  } catch (error) {
+    console.error('解析DOCX文件失败:', error.message)
+    return null
+  }
+}
+
+/**
+ * 解析TXT文件内容
+ * @param {string} filePath - 文件路径
+ * @returns {Promise<string>} 文本内容
+ */
+async function parseTxtFile(filePath) {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8')
+    return content.trim()
+  } catch (error) {
+    console.error('读取TXT文件失败:', error.message)
+    return null
+  }
+}
+
+/**
+ * 根据文件类型解析文档内容
+ * @param {string} filePath - 文件路径
+ * @param {string} mimeType - MIME类型
+ * @returns {Promise<string|null>} 文档文本内容
+ */
+async function parseDocumentContent(filePath, mimeType) {
+  if (!filePath || !fs.existsSync(filePath)) {
+    return null
+  }
+
+  // DOCX文件
+  if (mimeType.includes('word') || mimeType.includes('document') || filePath.endsWith('.docx')) {
+    return await parseDocxFile(filePath)
+  }
+  
+  // 纯文本文件
+  if (mimeType.includes('text') || filePath.endsWith('.txt') || filePath.endsWith('.md')) {
+    return await parseTxtFile(filePath)
+  }
+  
+  // PDF暂不支持（需要额外库）
+  if (mimeType.includes('pdf')) {
+    return '[PDF文件暂不支持解析，请上传Word文档或文本文件]'
+  }
+  
+  return null
+}
+
 module.exports = {
   callDoubaoAPI,
   callDoubaoAPIWithModel,
@@ -358,6 +418,9 @@ module.exports = {
   optimizeSupervisionLog,
   getAISuggestion,
   analyzeDocument,
-  readImageAsBase64
+  readImageAsBase64,
+  parseDocxFile,
+  parseTxtFile,
+  parseDocumentContent
 }
 

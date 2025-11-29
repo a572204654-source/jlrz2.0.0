@@ -14,7 +14,7 @@ const { success, badRequest, serverError, notFound } = require('../utils/respons
 const { query } = require('../config/database')
 const { authenticate } = require('../middleware/auth')
 const { randomString } = require('../utils/crypto')
-const { chatWithContext, chatWithImages, readImageAsBase64 } = require('../utils/doubao')
+const { chatWithContext, chatWithImages, readImageAsBase64, parseDocumentContent } = require('../utils/doubao')
 const { 
   aiChatUpload, 
   processUploadedFile, 
@@ -312,6 +312,7 @@ router.post('/messages', authenticate, async (req, res) => {
     // 处理附件
     let attachments = []
     let images = []
+    let documentContents = [] // 文档内容列表
     
     if (attachmentIds.length > 0) {
       const placeholders = attachmentIds.map(() => '?').join(',')
@@ -321,17 +322,34 @@ router.post('/messages', authenticate, async (req, res) => {
         [...attachmentIds, userId]
       )
 
-      // 提取图片附件用于多模态对话
+      // 处理附件：图片用于多模态，文档解析内容
       for (const att of attachments) {
+        const filePath = getFilePathFromUrl(att.file_url)
+        
         if (isImageForAI(att.mime_type)) {
+          // 图片：读取为base64用于多模态对话
           try {
-            const filePath = getFilePathFromUrl(att.file_url)
             if (filePath) {
               const imageData = await readImageAsBase64(filePath)
               images.push(imageData)
             }
           } catch (e) {
             console.error('读取图片失败:', e)
+          }
+        } else if (att.file_type === 'document') {
+          // 文档：解析内容
+          try {
+            if (filePath) {
+              const docContent = await parseDocumentContent(filePath, att.mime_type)
+              if (docContent) {
+                documentContents.push({
+                  fileName: att.file_name,
+                  content: docContent
+                })
+              }
+            }
+          } catch (e) {
+            console.error('解析文档失败:', e)
           }
         }
       }
@@ -383,14 +401,30 @@ router.post('/messages', authenticate, async (req, res) => {
         content: msg.content
       }))
 
+    // 构建发送给AI的消息内容
+    let messageToAI = content || ''
+    
+    // 如果有文档内容，将其添加到消息中
+    if (documentContents.length > 0) {
+      const docTexts = documentContents.map(doc => 
+        `【文档：${doc.fileName}】\n${doc.content}`
+      ).join('\n\n')
+      
+      if (messageToAI) {
+        messageToAI = `${messageToAI}\n\n---以下是上传的文档内容---\n\n${docTexts}`
+      } else {
+        messageToAI = `请分析以下文档内容：\n\n${docTexts}`
+      }
+    }
+
     // 调用AI API
     let aiReply
     if (images.length > 0) {
       // 有图片，使用多模态对话
-      aiReply = await chatWithImages(conversationHistory, content || '请描述这张图片', images)
+      aiReply = await chatWithImages(conversationHistory, messageToAI || '请描述这张图片', images)
     } else {
-      // 纯文本对话
-      aiReply = await chatWithContext(conversationHistory, content)
+      // 纯文本对话（可能包含文档内容）
+      aiReply = await chatWithContext(conversationHistory, messageToAI)
     }
 
     // 保存AI回复
