@@ -2,8 +2,21 @@ const axios = require('axios')
 const fs = require('fs')
 const path = require('path')
 const mammoth = require('mammoth')
-const pdfParse = require('pdf-parse')
 const config = require('../config')
+
+// pdf-parse 延迟加载（避免在服务器启动时加载失败）
+let pdfParse = null
+async function getPdfParser() {
+  if (!pdfParse) {
+    try {
+      pdfParse = require('pdf-parse')
+    } catch (e) {
+      console.warn('pdf-parse 加载失败，PDF解析功能不可用:', e.message)
+      return null
+    }
+  }
+  return pdfParse
+}
 
 /**
  * 调用豆包AI API
@@ -388,12 +401,16 @@ async function parseTxtFile(filePath) {
  */
 async function parsePdfFile(filePath) {
   try {
+    const parser = await getPdfParser()
+    if (!parser) {
+      return '[PDF解析功能暂不可用，请上传Word文档或文本文件]'
+    }
     const dataBuffer = fs.readFileSync(filePath)
-    const data = await pdfParse(dataBuffer)
+    const data = await parser(dataBuffer)
     return data.text.trim()
   } catch (error) {
     console.error('解析PDF文件失败:', error.message)
-    return null
+    return '[PDF文件解析失败，请尝试上传其他格式的文档]'
   }
 }
 
