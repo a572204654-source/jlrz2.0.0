@@ -103,8 +103,8 @@ router.get('/sessions', authenticate, async (req, res) => {
        FROM ai_chat_sessions
        ${whereClause}
        ORDER BY updated_at DESC
-       LIMIT ? OFFSET ?`,
-      [...params, pageSize, offset]
+       LIMIT ${Number(pageSize)} OFFSET ${Number(offset)}`,
+      params
     )
 
     // 查询总数
@@ -480,8 +480,8 @@ router.get('/messages', authenticate, async (req, res) => {
        FROM ai_chat_logs
        WHERE user_id = ? AND session_id = ?
        ORDER BY created_at ASC
-       LIMIT ? OFFSET ?`,
-      [userId, sessionId, pageSize, offset]
+       LIMIT ${Number(pageSize)} OFFSET ${Number(offset)}`,
+      [userId, sessionId]
     )
 
     // 处理附件JSON
