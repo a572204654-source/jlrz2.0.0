@@ -404,11 +404,19 @@ router.post('/messages', authenticate, async (req, res) => {
     // 构建发送给AI的消息内容
     let messageToAI = content || ''
     
+    // 文档内容最大长度限制（避免超时）
+    const MAX_DOC_LENGTH = 8000
+    
     // 如果有文档内容，将其添加到消息中
     if (documentContents.length > 0) {
-      const docTexts = documentContents.map(doc => 
-        `【文档：${doc.fileName}】\n${doc.content}`
-      ).join('\n\n')
+      const docTexts = documentContents.map(doc => {
+        // 截断过长的文档内容
+        let docContent = doc.content
+        if (docContent.length > MAX_DOC_LENGTH) {
+          docContent = docContent.substring(0, MAX_DOC_LENGTH) + '\n\n...[文档内容过长，已截断]'
+        }
+        return `【文档：${doc.fileName}】\n${docContent}`
+      }).join('\n\n')
       
       if (messageToAI) {
         messageToAI = `${messageToAI}\n\n---以下是上传的文档内容---\n\n${docTexts}`
@@ -417,14 +425,20 @@ router.post('/messages', authenticate, async (req, res) => {
       }
     }
 
-    // 调用AI API
+    // 调用AI API（设置较长超时时间）
+    const aiOptions = { timeout: 90000 } // 90秒超时
     let aiReply
-    if (images.length > 0) {
-      // 有图片，使用多模态对话
-      aiReply = await chatWithImages(conversationHistory, messageToAI || '请描述这张图片', images)
-    } else {
-      // 纯文本对话（可能包含文档内容）
-      aiReply = await chatWithContext(conversationHistory, messageToAI)
+    try {
+      if (images.length > 0) {
+        // 有图片，使用多模态对话
+        aiReply = await chatWithImages(conversationHistory, messageToAI || '请描述这张图片', images, aiOptions)
+      } else {
+        // 纯文本对话（可能包含文档内容）
+        aiReply = await chatWithContext(conversationHistory, messageToAI, aiOptions)
+      }
+    } catch (aiError) {
+      console.error('AI调用错误:', aiError.message)
+      aiReply = '抱歉，AI响应超时，请稍后重试或发送更简短的内容。'
     }
 
     // 保存AI回复
