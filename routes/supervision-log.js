@@ -498,6 +498,7 @@ router.get('/:id/export', authenticate, async (req, res) => {
         p.start_date as project_start_date,
         p.end_date as project_end_date,
         w.work_name,
+        w.project_work_code,
         w.work_code,
         w.unit_work,
         u.nickname as user_name

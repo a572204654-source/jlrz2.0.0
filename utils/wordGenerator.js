@@ -239,13 +239,18 @@ function formatDateForSignature(date) {
 async function generateSupervisionLogWord(logData) {
   try {
     // 提取数据（兼容驼峰和下划线命名）
+    // 字段说明：
+    // - workName / work_name: 单项工程名称
+    // - projectWorkCode / project_work_code: 单项工程编号
+    // - unitWork / unit_work: 单位工程名称
+    // - workCode / work_code: 单位工程编号
     const data = {
       projectName: logData.projectName || logData.project_name || '',
       projectCode: logData.projectCode || logData.project_code || '',
       workName: logData.workName || logData.work_name || '',
-      workCode: logData.workCode || logData.work_code || '',
+      projectWorkCode: logData.projectWorkCode || logData.project_work_code || '',
       unitWork: logData.unitWork || logData.unit_work || '',
-      unitWorkCode: logData.unitWorkCode || logData.unit_work_code || logData.workCode || logData.work_code || '',
+      unitWorkCode: logData.workCode || logData.work_code || '',
       organization: logData.organization || '',
       chiefEngineer: logData.chiefEngineer || logData.chief_engineer || '',
       specialistEngineer: logData.specialistEngineer || logData.specialist_engineer || logData.userName || logData.user_name || '',
@@ -355,7 +360,7 @@ async function generateSupervisionLogWord(logData) {
                 new TableCell({
                   width: { size: 2000, type: WidthType.DXA },
                   verticalAlign: VerticalAlign.CENTER,
-                  children: [createCenteredParagraph(data.workCode)]
+                  children: [createCenteredParagraph(data.projectWorkCode)]
                 })
               ]
             }),
