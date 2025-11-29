@@ -404,19 +404,11 @@ router.post('/messages', authenticate, async (req, res) => {
     // 构建发送给AI的消息内容
     let messageToAI = content || ''
     
-    // 文档内容最大长度限制（避免超时）
-    const MAX_DOC_LENGTH = 8000
-    
     // 如果有文档内容，将其添加到消息中
     if (documentContents.length > 0) {
-      const docTexts = documentContents.map(doc => {
-        // 截断过长的文档内容
-        let docContent = doc.content
-        if (docContent.length > MAX_DOC_LENGTH) {
-          docContent = docContent.substring(0, MAX_DOC_LENGTH) + '\n\n...[文档内容过长，已截断]'
-        }
-        return `【文档：${doc.fileName}】\n${docContent}`
-      }).join('\n\n')
+      const docTexts = documentContents.map(doc => 
+        `【文档：${doc.fileName}】\n${doc.content}`
+      ).join('\n\n')
       
       if (messageToAI) {
         messageToAI = `${messageToAI}\n\n---以下是上传的文档内容---\n\n${docTexts}`
@@ -426,7 +418,7 @@ router.post('/messages', authenticate, async (req, res) => {
     }
 
     // 调用AI API（设置较长超时时间）
-    const aiOptions = { timeout: 90000 } // 90秒超时
+    const aiOptions = { timeout: 180000 } // 3分钟超时
     let aiReply
     try {
       if (images.length > 0) {
