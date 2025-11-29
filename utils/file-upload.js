@@ -25,13 +25,19 @@ const ensureDir = (dir) => {
 ensureDir(AI_CHAT_DIR)
 
 /**
- * 生成唯一文件名
+ * 生成基于原始文件名的安全文件名（含时间戳防重名）
  */
 const generateFileName = (originalName) => {
   const ext = path.extname(originalName)
+  const base = path.basename(originalName, ext)
+  // 清理非法字符：Windows/Unix不允许的符号统一替换为下划线
+  const safeBase = base
+    .replace(/[\\\/\:\*\?\"\<\>\|]/g, '_')
+    .replace(/\s+/g, ' ') // 多空格归一
+    .trim()
   const timestamp = Date.now()
-  const random = crypto.randomBytes(8).toString('hex')
-  return `${timestamp}_${random}${ext}`
+  const random = crypto.randomBytes(4).toString('hex')
+  return `${safeBase}_${timestamp}_${random}${ext}`
 }
 
 /**
@@ -95,10 +101,28 @@ const aiChatStorage = multer.diskStorage({
     cb(null, dir)
   },
   filename: (req, file, cb) => {
-    // 处理中文文件名
-    const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8')
-    const newName = generateFileName(originalName)
-    cb(null, newName)
+    // 处理中文文件名，并尽量使用原始文件名保存
+    const originalNameRaw = file.originalname
+    const originalName = Buffer.from(originalNameRaw, 'latin1').toString('utf8')
+
+    const ext = path.extname(originalName)
+    const base = path.basename(originalName, ext)
+    const safeBase = base
+      .replace(/[\\\/\:\*\?\"\<\>\|]/g, '_')
+      .replace(/\s+/g, ' ')
+      .trim() || '文件'
+
+    const category = getFileCategory(file.mimetype)
+    const dir = path.join(AI_CHAT_DIR, category)
+
+    // 首选使用“原名.ext”，若已存在则追加(1)(2)...避免重名
+    let candidate = `${safeBase}${ext}`
+    let idx = 1
+    while (fs.existsSync(path.join(dir, candidate))) {
+      candidate = `${safeBase}(${idx})${ext}`
+      idx += 1
+    }
+    cb(null, candidate)
   }
 })
 

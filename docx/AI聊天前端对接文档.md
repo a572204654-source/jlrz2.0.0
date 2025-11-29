@@ -208,13 +208,15 @@ POST /api/ai/chat/messages
     "userMessage": {
       "id": 101,
       "type": "user",
-      "content": "你好",
+      "content": "请分析这份文档",
       "attachments": [
         {
           "id": 1,
-          "fileName": "文档.docx",
+          "fileName": "监理日志.docx",
           "fileType": "document",
-          "fileUrl": "http://xxx/uploads/xxx.docx"
+          "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "fileUrl": "http://xxx/uploads/ai-chat/document/xxx.docx",
+          "fileSize": 9796
         }
       ],
       "timestamp": "2024-11-29T10:30:00.000Z"
@@ -222,12 +224,17 @@ POST /api/ai/chat/messages
     "aiMessage": {
       "id": 102,
       "type": "ai",
-      "content": "你好！有什么可以帮助您的吗？",
+      "content": "好的，我已经分析了您上传的监理日志...",
+      "attachments": [],
       "timestamp": "2024-11-29T10:30:05.000Z"
     }
   }
 }
 ```
+
+**说明**
+- 返回的 `userMessage` 包含完整的附件信息（id、fileName、fileType、mimeType、fileUrl、fileSize）
+- 返回的 `aiMessage` 的 `attachments` 通常为空数组
 
 **前端示例**
 ```javascript
@@ -267,14 +274,23 @@ GET /api/ai/chat/messages?sessionId=xxx&page=1&pageSize=50
       {
         "id": 101,
         "type": "user",
-        "content": "你好",
-        "attachments": [],
+        "content": "请分析这份文档",
+        "attachments": [
+          {
+            "id": 1,
+            "fileName": "监理日志.docx",
+            "fileType": "document",
+            "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "fileUrl": "http://xxx/uploads/ai-chat/document/xxx.docx",
+            "fileSize": 9796
+          }
+        ],
         "timestamp": "2024-11-29 10:00:00"
       },
       {
         "id": 102,
         "type": "ai",
-        "content": "你好！有什么可以帮助您的吗？",
+        "content": "好的，我已经分析了您上传的监理日志...",
         "attachments": [],
         "timestamp": "2024-11-29 10:00:05"
       }
@@ -286,6 +302,12 @@ GET /api/ai/chat/messages?sessionId=xxx&page=1&pageSize=50
   }
 }
 ```
+
+**说明**
+- 每条消息都包含 `attachments` 数组
+- 用户消息可能有附件（上传的文件），AI消息通常为空
+- 附件信息包括：id、fileName、fileType、mimeType、fileUrl、fileSize
+- 前端可以根据 `fileType` 和 `mimeType` 判断文件类型并显示相应的图标或预览
 
 ---
 
@@ -390,8 +412,18 @@ async function uploadFiles(files) {
 
 **请求**
 ```
-GET /api/ai/chat/attachments?sessionId=xxx
+GET /api/ai/chat/attachments?sessionId=xxx&messageId=101
 ```
+
+**参数**
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| sessionId | string | 是 | 会话ID |
+| messageId | number | 否 | 消息ID，用于获取特定消息的附件 |
+
+**说明**
+- 如果不指定 `messageId`，返回会话中所有附件（包括未关联消息的附件）
+- 如果指定 `messageId`，只返回该消息关联的附件
 
 **响应**
 ```json
@@ -401,6 +433,7 @@ GET /api/ai/chat/attachments?sessionId=xxx
     "list": [
       {
         "id": 1,
+        "messageId": 101,
         "fileName": "文档.docx",
         "fileType": "document",
         "mimeType": "application/...",
@@ -504,17 +537,148 @@ console.log(result.aiMessage.content)
 3. **文件数量限制**：单次上传最多9个文件
 4. **AI响应时间**：复杂问题或大文档可能需要10-30秒响应
 5. **文档内容截断**：过长的文档内容可能会被截断以适应AI模型限制
+6. **附件显示**：
+   - 获取消息历史时，每条消息都会返回完整的附件信息
+   - 如果消息中没有attachments字段，系统会自动从ai_chat_attachments表查询
+   - 前端应该始终检查 `attachments` 数组，即使为空也应该显示为空数组
+7. **未发送的附件**：
+   - 用户上传文件后如果没有发送消息，附件会保存在数据库中
+   - 可以通过 `GET /api/ai/chat/attachments?sessionId=xxx` 获取会话中的所有附件
+   - 前端可以在消息输入框下方显示这些未关联的附件
 
 ---
 
-## 七、云托管域名
+## 七、前端实现建议
+
+### 7.1 显示消息中的附件
+
+```javascript
+// 在渲染消息时，检查并显示附件
+function renderMessage(message) {
+  let html = `<div class="message message-${message.type}">
+    <div class="content">${message.content}</div>`
+  
+  // 显示附件
+  if (message.attachments && message.attachments.length > 0) {
+    html += '<div class="attachments">'
+    message.attachments.forEach(att => {
+      html += `<div class="attachment">
+        <a href="${att.fileUrl}" download="${att.fileName}">
+          <span class="icon">${getFileIcon(att.fileType)}</span>
+          <span class="name">${att.fileName}</span>
+          <span class="size">${formatFileSize(att.fileSize)}</span>
+        </a>
+      </div>`
+    })
+    html += '</div>'
+  }
+  
+  html += '</div>'
+  return html
+}
+
+// 获取文件类型图标
+function getFileIcon(fileType) {
+  const icons = {
+    'document': '📄',
+    'image': '🖼️',
+    'audio': '🎵',
+    'video': '🎬'
+  }
+  return icons[fileType] || '📎'
+}
+
+// 格式化文件大小
+function formatFileSize(bytes) {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+}
+```
+
+### 7.2 显示未发送的附件
+
+```javascript
+// 获取会话中的所有附件（包括未关联消息的）
+async function loadSessionAttachments(sessionId) {
+  const res = await request.get('/api/ai/chat/attachments', {
+    params: { sessionId }
+  })
+  
+  // 过滤出未关联消息的附件（messageId为0或null）
+  const unsentAttachments = res.data.list.filter(att => !att.messageId)
+  
+  // 在输入框下方显示这些附件
+  renderUnsentAttachments(unsentAttachments)
+}
+
+// 渲染未发送的附件
+function renderUnsentAttachments(attachments) {
+  if (attachments.length === 0) return
+  
+  let html = '<div class="unsent-attachments"><strong>待发送的文件：</strong>'
+  attachments.forEach(att => {
+    html += `<div class="attachment-item">
+      <span>${att.fileName}</span>
+      <button onclick="removeAttachment(${att.id})">删除</button>
+    </div>`
+  })
+  html += '</div>'
+  
+  document.getElementById('attachmentContainer').innerHTML = html
+}
+```
+
+### 7.3 完整的消息发送流程
+
+```javascript
+async function sendMessageWithAttachments(sessionId, content) {
+  // 1. 获取已上传的附件ID
+  const attachmentsRes = await request.get('/api/ai/chat/attachments', {
+    params: { sessionId }
+  })
+  
+  const attachmentIds = attachmentsRes.data.list
+    .filter(att => !att.messageId) // 只选择未关联的附件
+    .map(att => att.id)
+  
+  // 2. 发送消息
+  const result = await request.post('/api/ai/chat/messages', {
+    sessionId,
+    content,
+    attachmentIds
+  })
+  
+  // 3. 显示用户消息和附件
+  displayMessage(result.data.userMessage)
+  
+  // 4. 显示AI回复
+  displayMessage(result.data.aiMessage)
+  
+  // 5. 清空未发送附件列表
+  document.getElementById('attachmentContainer').innerHTML = ''
+}
+```
+
+---
+
+## 八、云托管域名
 
 - **生产环境**：`https://api.yimengpl.com`
 - **本地开发**：`http://localhost:3000`
 
 ---
 
-## 八、更新日志
+## 九、更新日志
+
+### v2.1 (2024-11-29) - 附件显示修复
+- **修复**：获取消息历史时现在能正确显示附件信息
+- **改进**：消息返回格式统一，包含完整的附件元数据（mimeType、fileSize）
+- **新增**：获取附件列表API支持按messageId过滤
+- **新增**：前端实现建议，包括附件显示和未发送附件处理
+- **新增**：详细的故障排查和注意事项说明
 
 ### v2.0 (2024-11-29)
 - 新增会话管理功能

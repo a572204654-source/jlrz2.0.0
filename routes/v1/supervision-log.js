@@ -442,16 +442,15 @@ router.get('/supervision-logs/:id/export', authenticate, async (req, res) => {
     // 生成Word文档
     const wordBuffer = await generateSupervisionLogWord(logData)
 
-    // 格式化日期用于文件名
-    const dateStr = logData.log_date ? 
-      new Date(logData.log_date).toISOString().split('T')[0] : 
-      new Date().toISOString().split('T')[0]
-    
-    const fileName = `监理日志_${dateStr}.docx`
+    // 使用单位工程名称作为文件名（避免中文乱码，设置 filename 与 filename*）
+    const workName = (logData.unit_work || logData.work_name || '监理日志').toString().trim()
+    const fileName = `${workName}.docx`
+    const asciiFallback = fileName.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '')
+    const contentDisposition = `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(fileName)}`
 
     // 设置响应头
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`)
+    res.setHeader('Content-Disposition', contentDisposition)
     res.setHeader('Content-Length', wordBuffer.length)
 
     // 返回文件流

@@ -361,7 +361,9 @@ router.post('/messages', authenticate, async (req, res) => {
           id: a.id,
           fileName: a.file_name,
           fileType: a.file_type,
-          fileUrl: a.file_url
+          mimeType: a.mime_type,
+          fileUrl: a.file_url,
+          fileSize: a.file_size
         })))
       : null
 
@@ -470,7 +472,9 @@ router.post('/messages', authenticate, async (req, res) => {
           id: a.id,
           fileName: a.file_name,
           fileType: a.file_type,
-          fileUrl: a.file_url
+          mimeType: a.mime_type,
+          fileUrl: a.file_url,
+          fileSize: a.file_size
         })),
         timestamp: new Date().toISOString()
       },
@@ -478,6 +482,7 @@ router.post('/messages', authenticate, async (req, res) => {
         id: aiMsgResult.insertId,
         type: 'ai',
         content: aiReply,
+        attachments: [],
         timestamp: new Date().toISOString()
       }
     })
@@ -524,9 +529,11 @@ router.get('/messages', authenticate, async (req, res) => {
       [userId, sessionId]
     )
 
-    // 处理附件JSON（安全解析）
-    const formattedMessages = messages.map(msg => {
+    // 处理附件信息：从消息的attachments字段和ai_chat_attachments表中获取
+    const formattedMessages = await Promise.all(messages.map(async (msg) => {
       let attachments = []
+      
+      // 首先尝试解析消息中存储的attachments JSON
       if (msg.attachments) {
         try {
           attachments = JSON.parse(msg.attachments)
@@ -534,11 +541,34 @@ router.get('/messages', authenticate, async (req, res) => {
           console.error('解析附件JSON失败:', msg.id, e.message)
         }
       }
+      
+      // 如果消息中没有attachments，从ai_chat_attachments表查询该消息的附件
+      if (attachments.length === 0 && msg.id) {
+        try {
+          const dbAttachments = await query(
+            `SELECT 
+              id,
+              file_name as fileName,
+              file_type as fileType,
+              mime_type as mimeType,
+              file_url as fileUrl,
+              file_size as fileSize
+             FROM ai_chat_attachments
+             WHERE message_id = ? AND user_id = ?
+             ORDER BY created_at ASC`,
+            [msg.id, userId]
+          )
+          attachments = dbAttachments
+        } catch (e) {
+          console.error('查询消息附件失败:', msg.id, e.message)
+        }
+      }
+      
       return {
         ...msg,
         attachments
       }
-    })
+    }))
 
     // 查询总数
     const countResults = await query(
@@ -662,19 +692,31 @@ router.post('/upload', authenticate, aiChatUpload.array('files', 9), async (req,
  * 
  * 查询参数：
  * - sessionId: 会话ID（必填）
+ * - messageId: 消息ID（可选，用于获取特定消息的附件）
  */
 router.get('/attachments', authenticate, async (req, res) => {
   try {
     const userId = req.userId
     const sessionId = req.query.sessionId
+    const messageId = req.query.messageId
 
     if (!sessionId) {
       return badRequest(res, '会话ID不能为空')
     }
 
+    let whereClause = 'WHERE session_id = ? AND user_id = ?'
+    const params = [sessionId, userId]
+
+    // 如果指定了messageId，只获取该消息的附件
+    if (messageId) {
+      whereClause += ' AND message_id = ?'
+      params.push(messageId)
+    }
+
     const attachments = await query(
       `SELECT 
         id,
+        message_id as messageId,
         file_name as fileName,
         file_type as fileType,
         mime_type as mimeType,
@@ -682,9 +724,9 @@ router.get('/attachments', authenticate, async (req, res) => {
         file_size as fileSize,
         DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') as createdAt
        FROM ai_chat_attachments
-       WHERE session_id = ? AND user_id = ?
+       ${whereClause}
        ORDER BY created_at DESC`,
-      [sessionId, userId]
+      params
     )
 
     return success(res, { list: attachments })
