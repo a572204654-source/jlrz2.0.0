@@ -524,25 +524,36 @@ router.get('/messages', authenticate, async (req, res) => {
       [userId, sessionId]
     )
 
-    // 处理附件JSON
-    const formattedMessages = messages.map(msg => ({
-      ...msg,
-      attachments: msg.attachments ? JSON.parse(msg.attachments) : []
-    }))
+    // 处理附件JSON（安全解析）
+    const formattedMessages = messages.map(msg => {
+      let attachments = []
+      if (msg.attachments) {
+        try {
+          attachments = JSON.parse(msg.attachments)
+        } catch (e) {
+          console.error('解析附件JSON失败:', msg.id, e.message)
+        }
+      }
+      return {
+        ...msg,
+        attachments
+      }
+    })
 
     // 查询总数
-    const [countResult] = await query(
+    const countResults = await query(
       'SELECT COUNT(*) as total FROM ai_chat_logs WHERE user_id = ? AND session_id = ?',
       [userId, sessionId]
     )
+    const total = countResults[0]?.total || 0
 
     return success(res, {
       sessionId,
       list: formattedMessages,
-      total: countResult.total,
+      total,
       page,
       pageSize,
-      totalPages: Math.ceil(countResult.total / pageSize)
+      totalPages: Math.ceil(total / pageSize)
     })
 
   } catch (error) {
