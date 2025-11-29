@@ -14,7 +14,8 @@ const { success, badRequest, serverError, notFound } = require('../utils/respons
 const { query } = require('../config/database')
 const { authenticate } = require('../middleware/auth')
 const { randomString } = require('../utils/crypto')
-const { chatWithContext, chatWithImages, readImageAsBase64, parseDocumentContent } = require('../utils/doubao')
+// AI调用已禁用，改为返回人工客服提示
+// const { chatWithContext, chatWithImages, readImageAsBase64, parseDocumentContent } = require('../utils/doubao')
 const { 
   aiChatUpload, 
   processUploadedFile, 
@@ -322,37 +323,37 @@ router.post('/messages', authenticate, async (req, res) => {
         [...attachmentIds, userId]
       )
 
-      // 处理附件：图片用于多模态，文档解析内容
-      for (const att of attachments) {
-        const filePath = getFilePathFromUrl(att.file_url)
-        
-        if (isImageForAI(att.mime_type)) {
-          // 图片：读取为base64用于多模态对话
-          try {
-            if (filePath) {
-              const imageData = await readImageAsBase64(filePath)
-              images.push(imageData)
-            }
-          } catch (e) {
-            console.error('读取图片失败:', e)
-          }
-        } else if (att.file_type === 'document') {
-          // 文档：解析内容
-          try {
-            if (filePath) {
-              const docContent = await parseDocumentContent(filePath, att.mime_type)
-              if (docContent) {
-                documentContents.push({
-                  fileName: att.file_name,
-                  content: docContent
-                })
-              }
-            }
-          } catch (e) {
-            console.error('解析文档失败:', e)
-          }
-        }
-      }
+      // AI调用已禁用，以下图片和文档解析代码暂时注释
+      // for (const att of attachments) {
+      //   const filePath = getFilePathFromUrl(att.file_url)
+      //   
+      //   if (isImageForAI(att.mime_type)) {
+      //     // 图片：读取为base64用于多模态对话
+      //     try {
+      //       if (filePath) {
+      //         const imageData = await readImageAsBase64(filePath)
+      //         images.push(imageData)
+      //       }
+      //     } catch (e) {
+      //       console.error('读取图片失败:', e)
+      //     }
+      //   } else if (att.file_type === 'document') {
+      //     // 文档：解析内容
+      //     try {
+      //       if (filePath) {
+      //         const docContent = await parseDocumentContent(filePath, att.mime_type)
+      //         if (docContent) {
+      //           documentContents.push({
+      //             fileName: att.file_name,
+      //             content: docContent
+      //           })
+      //         }
+      //       }
+      //     } catch (e) {
+      //       console.error('解析文档失败:', e)
+      //     }
+      //   }
+      // }
     }
 
     // 保存用户消息
@@ -419,21 +420,21 @@ router.post('/messages', authenticate, async (req, res) => {
       }
     }
 
-    // 调用AI API（设置较长超时时间）
-    const aiOptions = { timeout: 180000 } // 3分钟超时
-    let aiReply
-    try {
-      if (images.length > 0) {
-        // 有图片，使用多模态对话
-        aiReply = await chatWithImages(conversationHistory, messageToAI || '请描述这张图片', images, aiOptions)
-      } else {
-        // 纯文本对话（可能包含文档内容）
-        aiReply = await chatWithContext(conversationHistory, messageToAI, aiOptions)
-      }
-    } catch (aiError) {
-      console.error('AI调用错误:', aiError.message)
-      aiReply = '抱歉，AI响应超时，请稍后重试或发送更简短的内容。'
-    }
+    // AI调用已禁用，改为返回人工客服提示
+    // const aiOptions = { timeout: 180000 } // 3分钟超时
+    let aiReply = '人工客服暂未上线'
+    // try {
+    //   if (images.length > 0) {
+    //     // 有图片，使用多模态对话
+    //     aiReply = await chatWithImages(conversationHistory, messageToAI || '请描述这张图片', images, aiOptions)
+    //   } else {
+    //     // 纯文本对话（可能包含文档内容）
+    //     aiReply = await chatWithContext(conversationHistory, messageToAI, aiOptions)
+    //   }
+    // } catch (aiError) {
+    //   console.error('AI调用错误:', aiError.message)
+    //   aiReply = '抱歉，AI响应超时，请稍后重试或发送更简短的内容。'
+    // }
 
     // 保存AI回复
     const aiMsgResult = await query(
