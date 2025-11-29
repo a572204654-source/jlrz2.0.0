@@ -308,14 +308,18 @@ router.put('/supervision-logs/:id', authenticate, async (req, res) => {
     }
 
     // 如果修改了日期，检查是否重复
-    if (logDate && logDate !== logs[0].log_date) {
-      const existing = await query(
-        'SELECT id FROM supervision_logs WHERE work_id = ? AND log_date = ? AND id != ?',
-        [logs[0].work_id, logDate, id]
-      )
+    if (logDate) {
+      // 将数据库日期转换为字符串格式进行比较
+      const dbLogDate = logs[0].log_date ? new Date(logs[0].log_date).toISOString().split('T')[0] : null
+      if (logDate !== dbLogDate) {
+        const existing = await query(
+          'SELECT id FROM supervision_logs WHERE work_id = ? AND log_date = ? AND id != ?',
+          [logs[0].work_id, logDate, id]
+        )
 
-      if (existing.length > 0) {
-        return badRequest(res, '该工程在此日期已有监理日志')
+        if (existing.length > 0) {
+          return badRequest(res, '该工程在此日期已有监理日志')
+        }
       }
     }
 
@@ -342,6 +346,7 @@ router.put('/supervision-logs/:id', authenticate, async (req, res) => {
 
   } catch (error) {
     console.error('更新监理日志错误:', error)
+    console.error('请求参数:', req.body)
     return serverError(res, '更新失败')
   }
 })

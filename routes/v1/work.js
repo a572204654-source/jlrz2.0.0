@@ -37,6 +37,7 @@ router.get('/works', authenticate, async (req, res) => {
         w.id,
         w.project_id as projectId,
         w.work_name as workName,
+        w.project_work_code as projectWorkCode,
         w.work_code as workCode,
         w.unit_work as unitWork,
         w.start_date as startDate,
@@ -89,6 +90,7 @@ router.get('/works/:id', authenticate, async (req, res) => {
         p.project_name as projectName,
         p.project_code as projectCode,
         w.work_name as workName,
+        w.project_work_code as projectWorkCode,
         w.work_code as workCode,
         w.unit_work as unitWork,
         w.start_date as startDate,
@@ -134,6 +136,7 @@ router.post('/works', authenticate, async (req, res) => {
     const {
       projectId,
       workName,
+      projectWorkCode,
       workCode,
       unitWork,
       startDate,
@@ -169,9 +172,9 @@ router.post('/works', authenticate, async (req, res) => {
     // 创建工程
     const result = await query(
       `INSERT INTO works 
-        (project_id, work_name, work_code, unit_work, start_date, end_date, color, description, creator_id) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [projectId, workName, workCode, unitWork, startDate || null, endDate || null, color || '#0d9488', description || '', userId]
+        (project_id, work_name, project_work_code, work_code, unit_work, start_date, end_date, color, description, creator_id) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [projectId, workName, projectWorkCode || null, workCode, unitWork, startDate || null, endDate || null, color || '#0d9488', description || '', userId]
     )
 
     return success(res, { id: result.insertId }, '创建成功')
@@ -192,6 +195,7 @@ router.put('/works/:id', authenticate, async (req, res) => {
     const userId = req.userId
     const {
       workName,
+      projectWorkCode,
       workCode,
       unitWork,
       startDate,
@@ -214,6 +218,7 @@ router.put('/works/:id', authenticate, async (req, res) => {
     await query(
       `UPDATE works SET 
         work_name = COALESCE(?, work_name),
+        project_work_code = COALESCE(?, project_work_code),
         work_code = COALESCE(?, work_code),
         unit_work = COALESCE(?, unit_work),
         start_date = COALESCE(?, start_date),
@@ -222,7 +227,7 @@ router.put('/works/:id', authenticate, async (req, res) => {
         description = COALESCE(?, description),
         updated_at = NOW()
       WHERE id = ?`,
-      [workName ?? null, workCode ?? null, unitWork ?? null, startDate ?? null, 
+      [workName ?? null, projectWorkCode ?? null, workCode ?? null, unitWork ?? null, startDate ?? null, 
        endDate ?? null, color ?? null, description ?? null, id]
     )
 

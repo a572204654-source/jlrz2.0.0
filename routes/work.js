@@ -43,6 +43,7 @@ router.get('/', authenticate, async (req, res) => {
         w.id,
         w.project_id,
         w.work_name,
+        w.project_work_code,
         w.work_code,
         w.unit_work,
         w.start_date,
@@ -68,6 +69,7 @@ router.get('/', authenticate, async (req, res) => {
       id: w.id,
       projectId: w.project_id,
       workName: w.work_name,
+      projectWorkCode: w.project_work_code,
       workCode: w.work_code,
       unitWork: w.unit_work,
       startDate: w.start_date,
@@ -117,6 +119,7 @@ router.get('/:id', authenticate, async (req, res) => {
         p.project_name,
         p.project_code,
         w.work_name,
+        w.project_work_code,
         w.work_code,
         w.unit_work,
         w.start_date,
@@ -152,6 +155,7 @@ router.get('/:id', authenticate, async (req, res) => {
       projectName: w.project_name,
       projectCode: w.project_code,
       workName: w.work_name,
+      projectWorkCode: w.project_work_code,
       workCode: w.work_code,
       unitWork: w.unit_work,
       startDate: w.start_date,
@@ -180,9 +184,10 @@ router.get('/:id', authenticate, async (req, res) => {
  * 
  * 请求参数:
  * - projectId: 项目ID（必填）
- * - workName: 工程名称（必填）
- * - workCode: 工程编号（必填）
- * - unitWork: 单位工程（必填）
+ * - workName: 单项工程名称（必填）
+ * - projectWorkCode: 单项工程编号
+ * - workCode: 单位工程编号（必填）
+ * - unitWork: 单位工程名称（必填）
  * - startDate: 监理日志开始时间
  * - endDate: 监理日志结束时间
  * - color: 工程标识颜色
@@ -194,6 +199,7 @@ router.post('/', authenticate, async (req, res) => {
     const {
       projectId,
       workName,
+      projectWorkCode,
       workCode,
       unitWork,
       startDate,
@@ -229,9 +235,9 @@ router.post('/', authenticate, async (req, res) => {
     // 创建工程
     const result = await query(
       `INSERT INTO works 
-        (project_id, work_name, work_code, unit_work, start_date, end_date, color, description, creator_id) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [projectId, workName, workCode, unitWork, startDate || null, endDate || null, color || '#0d9488', description || '', userId]
+        (project_id, work_name, project_work_code, work_code, unit_work, start_date, end_date, color, description, creator_id) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [projectId, workName, projectWorkCode || null, workCode, unitWork, startDate || null, endDate || null, color || '#0d9488', description || '', userId]
     )
 
     return success(res, { id: result.insertId }, '创建成功')
@@ -247,9 +253,10 @@ router.post('/', authenticate, async (req, res) => {
  * PUT /api/works/:id
  * 
  * 请求参数:
- * - workName: 工程名称
- * - workCode: 工程编号
- * - unitWork: 单位工程
+ * - workName: 单项工程名称
+ * - projectWorkCode: 单项工程编号
+ * - workCode: 单位工程编号
+ * - unitWork: 单位工程名称
  * - startDate: 监理日志开始时间
  * - endDate: 监理日志结束时间
  * - color: 工程标识颜色
@@ -261,6 +268,7 @@ router.put('/:id', authenticate, async (req, res) => {
     const userId = req.userId
     const {
       workName,
+      projectWorkCode,
       workCode,
       unitWork,
       startDate,
@@ -283,6 +291,7 @@ router.put('/:id', authenticate, async (req, res) => {
     await query(
       `UPDATE works SET 
         work_name = COALESCE(?, work_name),
+        project_work_code = COALESCE(?, project_work_code),
         work_code = COALESCE(?, work_code),
         unit_work = COALESCE(?, unit_work),
         start_date = COALESCE(?, start_date),
@@ -291,7 +300,7 @@ router.put('/:id', authenticate, async (req, res) => {
         description = COALESCE(?, description),
         updated_at = NOW()
       WHERE id = ?`,
-      [workName ?? null, workCode ?? null, unitWork ?? null, startDate ?? null, 
+      [workName ?? null, projectWorkCode ?? null, workCode ?? null, unitWork ?? null, startDate ?? null, 
        endDate ?? null, color ?? null, description ?? null, id]
     )
 

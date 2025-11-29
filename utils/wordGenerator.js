@@ -172,6 +172,14 @@ function createContentParagraph(text) {
 }
 
 /**
+ * 获取星期几
+ */
+function getWeekday(date) {
+  const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
+  return weekdays[date.getDay()]
+}
+
+/**
  * 格式化日期
  */
 function formatDate(date) {
@@ -182,6 +190,20 @@ function formatDate(date) {
   const month = d.getMonth() + 1
   const day = d.getDate()
   return `${year}年${month}月${day}日`
+}
+
+/**
+ * 格式化日期（带星期）
+ */
+function formatDateWithWeekday(date) {
+  if (!date) return ''
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return ''
+  const year = d.getFullYear()
+  const month = d.getMonth() + 1
+  const day = d.getDate()
+  const weekday = getWeekday(d)
+  return `${year}年${month}月${day}日  ${weekday}`
 }
 
 /**
@@ -316,22 +338,22 @@ async function generateSupervisionLogWord(logData) {
               height: { value: 500, rule: HeightRule.ATLEAST },
               children: [
                 new TableCell({
-                  width: { size: 2000, type: WidthType.DXA },
+                  width: { size: 2400, type: WidthType.DXA },
                   verticalAlign: VerticalAlign.CENTER,
                   children: [createCenteredParagraph('单项工程名称')]
                 }),
                 new TableCell({
-                  width: { size: 2400, type: WidthType.DXA },
+                  width: { size: 2000, type: WidthType.DXA },
                   verticalAlign: VerticalAlign.CENTER,
                   children: [createCenteredParagraph(data.workName)]
                 }),
                 new TableCell({
-                  width: { size: 2000, type: WidthType.DXA },
+                  width: { size: 2400, type: WidthType.DXA },
                   verticalAlign: VerticalAlign.CENTER,
                   children: [createCenteredParagraph('单项工程编号')]
                 }),
                 new TableCell({
-                  width: { size: 2400, type: WidthType.DXA },
+                  width: { size: 2000, type: WidthType.DXA },
                   verticalAlign: VerticalAlign.CENTER,
                   children: [createCenteredParagraph(data.workCode)]
                 })
@@ -343,22 +365,22 @@ async function generateSupervisionLogWord(logData) {
               height: { value: 500, rule: HeightRule.ATLEAST },
               children: [
                 new TableCell({
-                  width: { size: 2000, type: WidthType.DXA },
+                  width: { size: 2400, type: WidthType.DXA },
                   verticalAlign: VerticalAlign.CENTER,
                   children: [createCenteredParagraph('单位工程名称')]
                 }),
                 new TableCell({
-                  width: { size: 2400, type: WidthType.DXA },
+                  width: { size: 2000, type: WidthType.DXA },
                   verticalAlign: VerticalAlign.CENTER,
                   children: [createCenteredParagraph(data.unitWork)]
                 }),
                 new TableCell({
-                  width: { size: 2000, type: WidthType.DXA },
+                  width: { size: 2400, type: WidthType.DXA },
                   verticalAlign: VerticalAlign.CENTER,
                   children: [createCenteredParagraph('单位工程编号')]
                 }),
                 new TableCell({
-                  width: { size: 2400, type: WidthType.DXA },
+                  width: { size: 2000, type: WidthType.DXA },
                   verticalAlign: VerticalAlign.CENTER,
                   children: [createCenteredParagraph(data.unitWorkCode)]
                 })
@@ -395,7 +417,7 @@ async function generateSupervisionLogWord(logData) {
               height: { value: 500, rule: HeightRule.ATLEAST },
               children: [
                 new TableCell({
-                  width: { size: 2000, type: WidthType.DXA },
+                  width: { size: 2400, type: WidthType.DXA },
                   verticalAlign: VerticalAlign.CENTER,
                   children: [createCenteredParagraph('项目监理机构', { bold: true })]
                 }),
@@ -413,22 +435,22 @@ async function generateSupervisionLogWord(logData) {
               height: { value: 500, rule: HeightRule.ATLEAST },
               children: [
                 new TableCell({
-                  width: { size: 2000, type: WidthType.DXA },
+                  width: { size: 2400, type: WidthType.DXA },
                   verticalAlign: VerticalAlign.CENTER,
                   children: [createCenteredParagraph('总监理工程师')]
                 }),
                 new TableCell({
-                  width: { size: 2400, type: WidthType.DXA },
+                  width: { size: 2000, type: WidthType.DXA },
                   verticalAlign: VerticalAlign.CENTER,
                   children: [createCenteredParagraph(data.chiefEngineer)]
                 }),
                 new TableCell({
-                  width: { size: 2000, type: WidthType.DXA },
+                  width: { size: 2400, type: WidthType.DXA },
                   verticalAlign: VerticalAlign.CENTER,
                   children: [createCenteredParagraph('专业监理工程师')]
                 }),
                 new TableCell({
-                  width: { size: 2400, type: WidthType.DXA },
+                  width: { size: 2000, type: WidthType.DXA },
                   verticalAlign: VerticalAlign.CENTER,
                   children: [createCenteredParagraph(data.specialistEngineer)]
                 })
@@ -440,7 +462,7 @@ async function generateSupervisionLogWord(logData) {
               height: { value: 500, rule: HeightRule.ATLEAST },
               children: [
                 new TableCell({
-                  width: { size: 2000, type: WidthType.DXA },
+                  width: { size: 2400, type: WidthType.DXA },
                   verticalAlign: VerticalAlign.CENTER,
                   children: [createCenteredParagraph('监理日志起止时间')]
                 }),
@@ -528,7 +550,7 @@ async function generateSupervisionLogWord(logData) {
                   width: { size: 8200, type: WidthType.DXA },
                   verticalAlign: VerticalAlign.CENTER,
                   columnSpan: 3,
-                  children: [createCenteredParagraph(formatDate(data.logDate))]
+                  children: [createCenteredParagraph(formatDateWithWeekday(data.logDate))]
                 })
               ]
             }),
