@@ -644,7 +644,7 @@ router.post('/upload', authenticate, aiChatUpload.array('files', 9), async (req,
     const uploadedFiles = []
 
     for (const file of files) {
-      const fileInfo = processUploadedFile(file, req)
+      const fileInfo = await processUploadedFile(file, req)
       
       // 保存附件记录
       const result = await query(

@@ -189,6 +189,16 @@ app.get('/diagnose', (req, res) => {
       region: process.env.TENCENT_REGION || 'ap-guangzhou',
       usingStandardVars: !!(process.env.TENCENTCLOUD_SECRET_ID && process.env.TENCENTCLOUD_SECRET_KEY)
     },
+    cos: {
+      enabled: config.cos.enabled,
+      hasBucket: !!config.cos.bucket,
+      hasSecretId: !!config.cos.secretId,
+      hasSecretKey: !!config.cos.secretKey,
+      bucket: config.cos.bucket || '(未设置)',
+      region: config.cos.region || 'ap-guangzhou',
+      domain: config.cos.domain || '(使用默认域名)',
+      ready: config.cos.enabled && config.cos.bucket && config.cos.secretId && config.cos.secretKey
+    },
     diagnosis: {
       isProduction: process.env.NODE_ENV === 'production',
       shouldUseInternal: process.env.NODE_ENV === 'production',

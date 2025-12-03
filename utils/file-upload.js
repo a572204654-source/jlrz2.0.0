@@ -7,6 +7,8 @@ const multer = require('multer')
 const path = require('path')
 const fs = require('fs')
 const crypto = require('crypto')
+const config = require('../config')
+const { uploadToCOS, deleteFromCOS, isCosAvailable, getKeyFromUrl } = require('./cos-upload')
 
 // 上传目录配置
 const UPLOAD_DIR = process.env.UPLOAD_DIR || 'public/uploads'
@@ -153,19 +155,50 @@ const aiChatUpload = multer({
  * 处理上传后的文件信息
  * @param {Object} file - Multer文件对象
  * @param {Object} req - Express请求对象
- * @returns {Object} 文件信息
+ * @returns {Promise<Object>} 文件信息
  */
-const processUploadedFile = (file, req) => {
+const processUploadedFile = async (file, req) => {
   const category = getFileCategory(file.mimetype)
-  
-  // 构建文件URL
-  const relativePath = path.relative('public', file.path).replace(/\\/g, '/')
-  const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`
-  const fileUrl = `${baseUrl}/${relativePath}`
   
   // 处理原始文件名
   const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8')
   
+  let fileUrl = ''
+  let cosKey = ''
+  let storageType = 'local'
+
+  // 如果启用COS，上传到COS
+  if (isCosAvailable()) {
+    try {
+      const result = await uploadToCOS(
+        file.path,  // 传入本地临时文件路径
+        originalName,
+        `ai-chat/${category}`  // 按分类存储
+      )
+      fileUrl = result.url
+      cosKey = result.key
+      storageType = 'cos'
+      
+      // 删除本地临时文件
+      try {
+        fs.unlinkSync(file.path)
+      } catch (unlinkErr) {
+        console.warn('删除本地临时文件失败:', unlinkErr.message)
+      }
+    } catch (err) {
+      console.error('COS上传失败，回退到本地存储:', err.message)
+      // 回退到本地存储
+      const relativePath = path.relative('public', file.path).replace(/\\/g, '/')
+      const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`
+      fileUrl = `${baseUrl}/${relativePath}`
+    }
+  } else {
+    // 本地存储
+    const relativePath = path.relative('public', file.path).replace(/\\/g, '/')
+    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`
+    fileUrl = `${baseUrl}/${relativePath}`
+  }
+
   return {
     fileName: originalName,
     savedName: file.filename,
@@ -173,30 +206,50 @@ const processUploadedFile = (file, req) => {
     mimeType: file.mimetype,
     fileUrl: fileUrl,
     fileSize: file.size,
-    filePath: file.path
+    filePath: file.path,
+    cosKey: cosKey,        // COS文件Key，用于后续删除
+    storageType: storageType  // 存储类型：'local' 或 'cos'
   }
 }
 
 /**
- * 删除文件
- * @param {string} filePath - 文件路径
+ * 删除文件（支持本地和COS）
+ * @param {string} filePath - 本地文件路径
+ * @param {string} cosKey - COS文件Key（可选）
+ * @param {string} storageType - 存储类型：'local' 或 'cos'
  */
-const deleteFile = (filePath) => {
-  return new Promise((resolve, reject) => {
-    if (!filePath) {
-      resolve(false)
-      return
+const deleteFile = async (filePath, cosKey = '', storageType = 'local') => {
+  try {
+    // 如果是COS存储，优先删除COS文件
+    if (storageType === 'cos' && cosKey) {
+      try {
+        await deleteFromCOS(cosKey)
+        return true
+      } catch (err) {
+        console.error('删除COS文件失败:', err.message)
+        return false
+      }
     }
     
-    fs.unlink(filePath, (err) => {
-      if (err) {
-        console.error('删除文件失败:', err)
-        resolve(false)
-      } else {
-        resolve(true)
-      }
+    // 本地文件删除
+    if (!filePath) {
+      return false
+    }
+    
+    return new Promise((resolve) => {
+      fs.unlink(filePath, (err) => {
+        if (err) {
+          console.error('删除本地文件失败:', err)
+          resolve(false)
+        } else {
+          resolve(true)
+        }
+      })
     })
-  })
+  } catch (err) {
+    console.error('删除文件异常:', err)
+    return false
+  }
 }
 
 /**
@@ -251,5 +304,10 @@ module.exports = {
   imageToBase64,
   ALLOWED_MIME_TYPES,
   FILE_SIZE_LIMITS,
-  ensureDir
+  ensureDir,
+  // 重新导出COS相关函数，方便外部使用
+  uploadToCOS,
+  deleteFromCOS,
+  isCosAvailable,
+  getKeyFromUrl
 }

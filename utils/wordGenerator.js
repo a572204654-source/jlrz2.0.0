@@ -708,6 +708,510 @@ async function generateSupervisionLogWord(logData) {
   }
 }
 
+/**
+ * 生成单条日志内容页（用于批量导出）
+ * @param {Object} logData - 监理日志数据
+ * @returns {Array} 内容页children数组
+ */
+function generateLogContentChildren(logData) {
+  const data = {
+    workName: logData.workName || logData.work_name || '',
+    unitWork: logData.unitWork || logData.unit_work || '',
+    unitWorkCode: logData.workCode || logData.work_code || '',
+    logDate: logData.logDate || logData.log_date || '',
+    weather: logData.weather || '',
+    projectDynamics: logData.projectDynamics || logData.project_dynamics || '',
+    supervisionWork: logData.supervisionWork || logData.supervision_work || '',
+    safetyWork: logData.safetyWork || logData.safety_work || '',
+    recorderName: logData.recorderName || logData.recorder_name || logData.userName || logData.user_name || '',
+    recorderDate: logData.recorderDate || logData.recorder_date || '',
+    reviewerName: logData.reviewerName || logData.reviewer_name || '',
+    reviewerDate: logData.reviewerDate || logData.reviewer_date || ''
+  }
+
+  return [
+    // 顶部标题
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 200 },
+      children: [
+        new TextRun({
+          text: '监理日志',
+          size: 28,
+          bold: true,
+          font: '宋体'
+        })
+      ]
+    }),
+
+    // 日志内容表格
+    new Table({
+      width: { size: 9800, type: WidthType.DXA },
+      borders: tableBorders,
+      rows: [
+        // 单位工程名称 + 单位工程编号
+        new TableRow({
+          height: { value: 450, rule: HeightRule.ATLEAST },
+          children: [
+            new TableCell({
+              width: { size: 1600, type: WidthType.DXA },
+              verticalAlign: VerticalAlign.CENTER,
+              children: [createCenteredParagraph('单位工程名称')]
+            }),
+            new TableCell({
+              width: { size: 3600, type: WidthType.DXA },
+              verticalAlign: VerticalAlign.CENTER,
+              children: [createCenteredParagraph(data.unitWork || data.workName)]
+            }),
+            new TableCell({
+              width: { size: 1600, type: WidthType.DXA },
+              verticalAlign: VerticalAlign.CENTER,
+              children: [createCenteredParagraph('单位工程编号')]
+            }),
+            new TableCell({
+              width: { size: 3000, type: WidthType.DXA },
+              verticalAlign: VerticalAlign.CENTER,
+              children: [createCenteredParagraph(data.unitWorkCode)]
+            })
+          ]
+        }),
+
+        // 日期
+        new TableRow({
+          height: { value: 400, rule: HeightRule.ATLEAST },
+          children: [
+            new TableCell({
+              width: { size: 1600, type: WidthType.DXA },
+              verticalAlign: VerticalAlign.CENTER,
+              children: [createCenteredParagraph('日    期')]
+            }),
+            new TableCell({
+              width: { size: 8200, type: WidthType.DXA },
+              verticalAlign: VerticalAlign.CENTER,
+              columnSpan: 3,
+              children: [createCenteredParagraph(formatDateWithWeekday(data.logDate))]
+            })
+          ]
+        }),
+
+        // 气象
+        new TableRow({
+          height: { value: 400, rule: HeightRule.ATLEAST },
+          children: [
+            new TableCell({
+              width: { size: 1600, type: WidthType.DXA },
+              verticalAlign: VerticalAlign.CENTER,
+              children: [createCenteredParagraph('气    象')]
+            }),
+            new TableCell({
+              width: { size: 8200, type: WidthType.DXA },
+              verticalAlign: VerticalAlign.CENTER,
+              columnSpan: 3,
+              children: [createCenteredParagraph(data.weather)]
+            })
+          ]
+        }),
+
+        // 工程动态
+        new TableRow({
+          height: { value: 3800, rule: HeightRule.ATLEAST },
+          children: [
+            new TableCell({
+              width: { size: 600, type: WidthType.DXA },
+              verticalAlign: VerticalAlign.CENTER,
+              children: createVerticalTextParagraphs('工程动态')
+            }),
+            new TableCell({
+              width: { size: 9200, type: WidthType.DXA },
+              verticalAlign: VerticalAlign.TOP,
+              columnSpan: 3,
+              children: [createContentParagraph(data.projectDynamics)]
+            })
+          ]
+        }),
+
+        // 监理工作情况
+        new TableRow({
+          height: { value: 3800, rule: HeightRule.ATLEAST },
+          children: [
+            new TableCell({
+              width: { size: 600, type: WidthType.DXA },
+              verticalAlign: VerticalAlign.CENTER,
+              children: createVerticalTextParagraphs('监理工作情况')
+            }),
+            new TableCell({
+              width: { size: 9200, type: WidthType.DXA },
+              verticalAlign: VerticalAlign.TOP,
+              columnSpan: 3,
+              children: [createContentParagraph(data.supervisionWork)]
+            })
+          ]
+        }),
+
+        // 安全监理工作情况
+        new TableRow({
+          height: { value: 3800, rule: HeightRule.ATLEAST },
+          children: [
+            new TableCell({
+              width: { size: 600, type: WidthType.DXA },
+              verticalAlign: VerticalAlign.CENTER,
+              children: createVerticalTextParagraphs('安全监理工作情况')
+            }),
+            new TableCell({
+              width: { size: 9200, type: WidthType.DXA },
+              verticalAlign: VerticalAlign.TOP,
+              columnSpan: 3,
+              children: [createContentParagraph(data.safetyWork)]
+            })
+          ]
+        }),
+
+        // 记录人 + 审核人签名行
+        new TableRow({
+          height: { value: 500, rule: HeightRule.ATLEAST },
+          children: [
+            new TableCell({
+              width: { size: 1000, type: WidthType.DXA },
+              verticalAlign: VerticalAlign.CENTER,
+              children: [createCenteredParagraph('记录人')]
+            }),
+            new TableCell({
+              width: { size: 4000, type: WidthType.DXA },
+              verticalAlign: VerticalAlign.CENTER,
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: '  ' + data.recorderName + '        ',
+                      size: 21,
+                      font: '宋体'
+                    }),
+                    new TextRun({
+                      text: formatDateForSignature(data.recorderDate),
+                      size: 21,
+                      font: '宋体'
+                    })
+                  ]
+                })
+              ]
+            }),
+            new TableCell({
+              width: { size: 1000, type: WidthType.DXA },
+              verticalAlign: VerticalAlign.CENTER,
+              children: [createCenteredParagraph('审核人')]
+            }),
+            new TableCell({
+              width: { size: 3800, type: WidthType.DXA },
+              verticalAlign: VerticalAlign.CENTER,
+              children: [
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: '  ' + data.reviewerName + '        ',
+                      size: 21,
+                      font: '宋体'
+                    }),
+                    new TextRun({
+                      text: formatDateForSignature(data.reviewerDate),
+                      size: 21,
+                      font: '宋体'
+                    })
+                  ]
+                })
+              ]
+            })
+          ]
+        })
+      ]
+    })
+  ]
+}
+
+/**
+ * 生成批量导出Word文档
+ * @param {Array} logsData - 监理日志数据数组
+ * @param {Object} projectInfo - 项目信息 { projectName, workName }
+ * @returns {Promise<Buffer>} Word文档Buffer
+ */
+async function generateSupervisionLogBatchWord(logsData, projectInfo) {
+  try {
+    // 使用第一条日志的数据作为封面信息
+    const firstLog = logsData[0]
+    
+    // 获取日期范围（所有日志的最早和最晚日期）
+    let minDate = null
+    let maxDate = null
+    logsData.forEach(log => {
+      const logDate = new Date(log.logDate || log.log_date)
+      if (!isNaN(logDate.getTime())) {
+        if (!minDate || logDate < minDate) minDate = logDate
+        if (!maxDate || logDate > maxDate) maxDate = logDate
+      }
+    })
+
+    // 提取封面数据（与单个导出格式一致）
+    const data = {
+      projectName: projectInfo.projectName || firstLog.project_name || '',
+      projectCode: firstLog.project_code || '',
+      workName: projectInfo.workName || firstLog.work_name || '',
+      projectWorkCode: firstLog.project_work_code || '',
+      unitWork: firstLog.unit_work || '',
+      unitWorkCode: firstLog.work_code || '',
+      organization: firstLog.organization || '',
+      chiefEngineer: firstLog.chief_engineer || '',
+      specialistEngineer: firstLog.user_name || '',
+      // 使用所有日志的日期范围
+      projectStartDate: minDate,
+      projectEndDate: maxDate
+    }
+
+    // ==================== 第一页：封面页（与单个导出一致） ====================
+    const coverPage = {
+      properties: {
+        page: {
+          size: {
+            width: PAGE_WIDTH,
+            height: PAGE_HEIGHT
+          },
+          margin: COVER_MARGIN
+        }
+      },
+      children: [
+        // 顶部标题行：附录11-5表 + 监理日志
+        new Paragraph({
+          spacing: { after: 120 },
+          children: [
+            new TextRun({
+              text: '附录11-5表',
+              size: 21,
+              font: '宋体'
+            }),
+            new TextRun({
+              text: '                                监理日志',
+              size: 21,
+              font: '宋体',
+              bold: true
+            })
+          ]
+        }),
+
+        // 封面主表格
+        new Table({
+          width: { size: 8800, type: WidthType.DXA },
+          borders: tableBorders,
+          rows: [
+            // 项目名称
+            new TableRow({
+              height: { value: 500, rule: HeightRule.ATLEAST },
+              children: [
+                new TableCell({
+                  width: { size: 2000, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  children: [createCenteredParagraph('项目名称')]
+                }),
+                new TableCell({
+                  width: { size: 6800, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  columnSpan: 3,
+                  children: [createCenteredParagraph(data.projectName)]
+                })
+              ]
+            }),
+
+            // 项目编号
+            new TableRow({
+              height: { value: 500, rule: HeightRule.ATLEAST },
+              children: [
+                new TableCell({
+                  width: { size: 2000, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  children: [createCenteredParagraph('项目编号')]
+                }),
+                new TableCell({
+                  width: { size: 6800, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  columnSpan: 3,
+                  children: [createCenteredParagraph(data.projectCode)]
+                })
+              ]
+            }),
+
+            // 单项工程名称 + 单项工程编号
+            new TableRow({
+              height: { value: 500, rule: HeightRule.ATLEAST },
+              children: [
+                new TableCell({
+                  width: { size: 2400, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  children: [createCenteredParagraph('单项工程名称')]
+                }),
+                new TableCell({
+                  width: { size: 2000, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  children: [createCenteredParagraph(data.workName)]
+                }),
+                new TableCell({
+                  width: { size: 2400, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  children: [createCenteredParagraph('单项工程编号')]
+                }),
+                new TableCell({
+                  width: { size: 2000, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  children: [createCenteredParagraph(data.projectWorkCode)]
+                })
+              ]
+            }),
+
+            // 单位工程名称 + 单位工程编号
+            new TableRow({
+              height: { value: 500, rule: HeightRule.ATLEAST },
+              children: [
+                new TableCell({
+                  width: { size: 2400, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  children: [createCenteredParagraph('单位工程名称')]
+                }),
+                new TableCell({
+                  width: { size: 2000, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  children: [createCenteredParagraph(data.unitWork)]
+                }),
+                new TableCell({
+                  width: { size: 2400, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  children: [createCenteredParagraph('单位工程编号')]
+                }),
+                new TableCell({
+                  width: { size: 2000, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  children: [createCenteredParagraph(data.unitWorkCode)]
+                })
+              ]
+            }),
+
+            // 大标题区域："监理日志"
+            new TableRow({
+              height: { value: 8000, rule: HeightRule.ATLEAST },
+              children: [
+                new TableCell({
+                  width: { size: 8800, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  columnSpan: 4,
+                  children: [
+                    new Paragraph({
+                      alignment: AlignmentType.CENTER,
+                      children: [
+                        new TextRun({
+                          text: '监 理 日 志',
+                          size: 72,
+                          bold: true,
+                          font: '宋体'
+                        })
+                      ]
+                    })
+                  ]
+                })
+              ]
+            }),
+
+            // 项目监理机构
+            new TableRow({
+              height: { value: 500, rule: HeightRule.ATLEAST },
+              children: [
+                new TableCell({
+                  width: { size: 2400, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  children: [createCenteredParagraph('项目监理机构', { bold: true })]
+                }),
+                new TableCell({
+                  width: { size: 6800, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  columnSpan: 3,
+                  children: [createCenteredParagraph(data.organization)]
+                })
+              ]
+            }),
+
+            // 总监理工程师 + 专业监理工程师
+            new TableRow({
+              height: { value: 500, rule: HeightRule.ATLEAST },
+              children: [
+                new TableCell({
+                  width: { size: 2400, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  children: [createCenteredParagraph('总监理工程师')]
+                }),
+                new TableCell({
+                  width: { size: 2000, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  children: [createCenteredParagraph(data.chiefEngineer)]
+                }),
+                new TableCell({
+                  width: { size: 2400, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  children: [createCenteredParagraph('专业监理工程师')]
+                }),
+                new TableCell({
+                  width: { size: 2000, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  children: [createCenteredParagraph(data.specialistEngineer)]
+                })
+              ]
+            }),
+
+            // 监理日志起止时间
+            new TableRow({
+              height: { value: 500, rule: HeightRule.ATLEAST },
+              children: [
+                new TableCell({
+                  width: { size: 2400, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  children: [createCenteredParagraph('监理日志起止时间')]
+                }),
+                new TableCell({
+                  width: { size: 6800, type: WidthType.DXA },
+                  verticalAlign: VerticalAlign.CENTER,
+                  columnSpan: 3,
+                  children: [createCenteredParagraph(formatDateRange(data.projectStartDate, data.projectEndDate))]
+                })
+              ]
+            })
+          ]
+        })
+      ]
+    }
+
+    // ==================== 后续页面：各条日志内容 ====================
+    const logSections = logsData.map((logData, index) => ({
+      properties: {
+        page: {
+          size: {
+            width: PAGE_WIDTH,
+            height: PAGE_HEIGHT
+          },
+          margin: CONTENT_MARGIN
+        }
+      },
+      children: generateLogContentChildren(logData)
+    }))
+
+    // 创建文档
+    const doc = new Document({
+      sections: [coverPage, ...logSections]
+    })
+
+    // 生成Buffer
+    const buffer = await Packer.toBuffer(doc)
+    return buffer
+
+  } catch (error) {
+    console.error('生成批量Word文档错误:', error)
+    throw error
+  }
+}
+
 module.exports = {
-  generateSupervisionLogWord
+  generateSupervisionLogWord,
+  generateSupervisionLogBatchWord
 }

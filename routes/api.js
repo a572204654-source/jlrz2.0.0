@@ -11,6 +11,7 @@ const aiChatRouter = require('./ai-chat')
 const aiProviderRouter = require('./ai-provider')
 const attachmentRouter = require('./attachment')
 const weatherRouter = require('./weather')
+const uploadRouter = require('./upload')
 
 // 注册各模块路由
 router.use('/auth', authRouter)
@@ -22,6 +23,7 @@ router.use('/ai/chat', aiChatRouter)  // AI聊天API（支持文件上传、多�
 router.use('/ai', aiProviderRouter)
 router.use('/attachments', attachmentRouter)
 router.use('/weather', weatherRouter)
+router.use('/upload', uploadRouter)
 
 // API根路径
 router.get('/', (req, res) => {
@@ -48,7 +50,8 @@ router.get('/', (req, res) => {
       aiChat: '/api/ai/chat/* - AI聊天（支持文件上传、多模态）',
       aiProvider: '/api/ai/provider-key - AI提供商密钥接口',
       attachments: '/api/attachments - 附件相关接口',
-      weather: '/api/weather/current - 气象相关接口'
+      weather: '/api/weather/current - 气象相关接口',
+      upload: '/api/upload/* - 文件上传（头像、附件、COS）'
     }
   })
 })

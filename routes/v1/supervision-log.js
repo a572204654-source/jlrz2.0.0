@@ -462,5 +462,82 @@ router.get('/supervision-logs/:id/export', authenticate, async (req, res) => {
   }
 })
 
+/**
+ * 批量导出监理日志（Word）
+ * POST /api/v1/supervision-logs/export-batch
+ */
+router.post('/supervision-logs/export-batch', authenticate, async (req, res) => {
+  try {
+    const userId = req.userId
+    const { logIds, projectName, workName, fileName } = req.body
+
+    // 参数验证
+    if (!logIds || !Array.isArray(logIds) || logIds.length === 0) {
+      return badRequest(res, '请选择要导出的日志')
+    }
+
+    if (logIds.length > 100) {
+      return badRequest(res, '单次最多导出100条日志')
+    }
+
+    // 构建IN查询的占位符
+    const placeholders = logIds.map(() => '?').join(',')
+
+    // 查询所有选中的日志详情 - 只能导出自己创建的日志
+    const logs = await query(
+      `SELECT 
+        sl.*,
+        p.project_name,
+        p.project_code,
+        p.organization,
+        p.chief_engineer,
+        p.start_date as project_start_date,
+        p.end_date as project_end_date,
+        w.work_name,
+        w.project_work_code,
+        w.work_code,
+        w.unit_work,
+        u.nickname as user_name
+       FROM supervision_logs sl
+       LEFT JOIN projects p ON sl.project_id = p.id
+       LEFT JOIN works w ON sl.work_id = w.id
+       LEFT JOIN users u ON sl.user_id = u.id
+       WHERE sl.id IN (${placeholders}) AND sl.user_id = ?
+       ORDER BY sl.log_date ASC`,
+      [...logIds, userId]
+    )
+
+    if (logs.length === 0) {
+      return notFound(res, '未找到可导出的日志')
+    }
+
+    // 导入Word生成工具
+    const { generateSupervisionLogBatchWord } = require('../../utils/wordGenerator')
+
+    // 生成批量Word文档
+    const wordBuffer = await generateSupervisionLogBatchWord(logs, {
+      projectName: projectName || logs[0].project_name || '',
+      workName: workName || logs[0].work_name || ''
+    })
+
+    // 设置文件名
+    const exportFileName = fileName || `监理日志批量导出_${new Date().toISOString().split('T')[0]}.docx`
+    const asciiFallback = exportFileName.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '')
+    const contentDisposition = `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(exportFileName)}`
+
+    // 设置响应头
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    res.setHeader('Content-Disposition', contentDisposition)
+    res.setHeader('Content-Length', wordBuffer.length)
+
+    // 返回文件流
+    res.send(wordBuffer)
+
+  } catch (error) {
+    console.error('批量导出监理日志错误:', error)
+    return serverError(res, '批量导出失败')
+  }
+})
+
 module.exports = router
 

@@ -66,6 +66,16 @@ module.exports = {
     domain: process.env.SERVICE_DOMAIN || 'http://localhost'
   },
 
+  // 腾讯云COS配置
+  cos: {
+    secretId: process.env.COS_SECRET_ID || process.env.TENCENTCLOUD_SECRET_ID || '',
+    secretKey: process.env.COS_SECRET_KEY || process.env.TENCENTCLOUD_SECRET_KEY || '',
+    bucket: process.env.COS_BUCKET || '',
+    region: process.env.COS_REGION || 'ap-guangzhou',
+    domain: process.env.COS_DOMAIN || '',  // 可选：自定义域名或CDN域名
+    enabled: process.env.COS_ENABLED === 'true'  // 是否启用COS，默认false使用本地存储
+  },
+
   // 和风天气配置（JWT认证）
   qweather: {
     // JWT认证配置
